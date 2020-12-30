@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30413.136
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MSFS Cloud Assistant", "MSFS Cloud Assistant\MSFS Cloud Assistant.csproj", "{69E1DCFD-A320-4266-ABFE-29CCAE4BDAB3}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{69E1DCFD-A320-4266-ABFE-29CCAE4BDAB3}.Debug|Any CPU.ActiveCfg = Release|x64
+		{69E1DCFD-A320-4266-ABFE-29CCAE4BDAB3}.Debug|Any CPU.Build.0 = Release|x64
+		{69E1DCFD-A320-4266-ABFE-29CCAE4BDAB3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{69E1DCFD-A320-4266-ABFE-29CCAE4BDAB3}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {EF43CBCC-389C-4749-96C7-6E89CD7EA48D}
+	EndGlobalSection
+EndGlobal
