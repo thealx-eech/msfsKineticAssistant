@@ -17,10 +17,23 @@ namespace MSFS_Cloud_Assistant
         public double PlaneHeading;
         public double PlanePitch;
         public double PlaneBank;
-        public double LightWing;
-        public double LightLogo;
-        public double LightRecognition;
         public double SimOnGround;
         public double BrakeParkingPosition;
+
+        public double LIGHTPANEL;
+        public double LIGHTSTROBE;
+        public double LIGHTLANDING;
+        public double LIGHTTAXI;
+        public double LIGHTBEACON;
+        public double LIGHTNAV;
+        public double LIGHTLOGO;
+        public double LIGHTWING;
+        public double LIGHTRECOGNITION;
+        public double LIGHTCABIN;
+        public double LIGHTGLARESHIELD;
+        public double LIGHTPEDESTRAL;
+        public double LIGHTPOTENTIOMETER;
+
+        // SHORTCUTS
     };
 }

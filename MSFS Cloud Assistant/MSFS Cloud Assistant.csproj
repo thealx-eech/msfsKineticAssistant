@@ -8,7 +8,7 @@
     <OutputType>WinExe</OutputType>
     <RootNamespace>MSFS_Cloud_Assistant</RootNamespace>
     <AssemblyName>MSFS Cloud Assistant</AssemblyName>
-    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <ProjectTypeGuids>{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
     <WarningLevel>4</WarningLevel>
@@ -125,6 +125,9 @@
       <DependentUpon>App.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="PlaneInfoRotate.cs" />
+    <Compile Include="SimvarsViewModel.cs" />
+    <Compile Include="simVars.cs" />
     <Compile Include="MathClass.cs" />
     <Compile Include="PlaneInfoCommit.cs" />
     <Compile Include="PlaneInfoResponse.cs" />
@@ -183,6 +186,20 @@
     <Resource Include="arrestor.bmp" />
     <Resource Include="launchpad.bmp" />
     <Resource Include="settings.bmp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="ctrl.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="ctrl1.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="ctrl2.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="error.wav" />
+    <Content Include="false.wav" />
+    <Content Include="true.wav" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="..\packages\CTrue.FsConnect.1.0.3\build\CTrue.FsConnect.targets" Condition="Exists('..\packages\CTrue.FsConnect.1.0.3\build\CTrue.FsConnect.targets')" />

@@ -1,9 +1,5 @@
 ﻿using Accord.Math;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace MSFS_Cloud_Assistant
 {
@@ -27,14 +23,18 @@ namespace MSFS_Cloud_Assistant
             Vector3 globalToWinch = new Vector3((float)globalX, (float)globalY, (float)globalZ);
             Vector3 globalToWinchNorm = globalToWinch;
             globalToWinchNorm.Normalize();
+            
+            _winchDirection.climbAngle = - Math.Asin(globalToWinchNorm.Y);
 
             Matrix3x3 attitude = Matrix3x3.CreateFromYawPitchRoll((float)_planeInfoResponse.PlaneHeading, (float)_planeInfoResponse.PlanePitch, (float)_planeInfoResponse.PlaneBank);
             _winchDirection.localForceDirection = Matrix3x3.Multiply(attitude.Inverse(), globalToWinchNorm);
             _winchDirection.localForceDirection.Normalize();
 
-            _winchDirection.heading = Math.Atan2(_winchDirection.localForceDirection.X, _winchDirection.localForceDirection.Z);//Math.Atan2(globalToWinchNorm.X, globalToWinchNorm.Z) - _planeInfoResponse.PlaneHeading;
-            _winchDirection.pitch = Math.Asin(_winchDirection.localForceDirection.Y/* / localForceNorm*/);//Math.Asin(globalToWinchNorm.Y) + _planeInfoResponse.PlanePitch;
+            _winchDirection.heading = Math.Atan2(_winchDirection.localForceDirection.X, _winchDirection.localForceDirection.Z);
+            _winchDirection.pitch = Math.Asin(_winchDirection.localForceDirection.Y);
             _winchDirection.distance = (double)(globalToWinch.Norm);
+            globalToWinch.Y = 0;
+            _winchDirection.groundDistance = (double)(globalToWinch.Norm);
 
             if (_winchDirection.heading > Math.PI) { _winchDirection.heading -= 2 * Math.PI; }
             if (_winchDirection.heading < -Math.PI) { _winchDirection.heading += 2 * Math.PI; }
@@ -73,12 +73,41 @@ namespace MSFS_Cloud_Assistant
 
             return speed;
         }
+
+        public double getCableTension(double cableLength, double elasticExtension,winchDirection _winchDirection, double lastFrameTiming)
+        {
+            double cableTension = 0;
+            double dumpingLength = cableLength * elasticExtension / 100;
+            if (cableLength < _winchDirection.distance)
+            {
+                if (cableLength + dumpingLength < _winchDirection.distance) // CABLE FAILURE
+                {
+                    cableTension = 6 * 9.81;
+                }
+                else
+                {
+                    double diff = _winchDirection.distance - cableLength;
+                    cableTension = Math.Pow(0.75 + diff / dumpingLength, 8);
+                }
+            }
+
+            return cableTension;
+        }
     }
 
     public class winchPosition
     {
+        public winchPosition() { }
+        public winchPosition(GeoLocation Location, double Altitude, double Radius = 0)
+        {
+            location = Location;
+            alt = Altitude;
+            radius = Radius;
+        }
+
         public GeoLocation location { get; set; }
         public double alt { get; set; }
+        public double radius { get; set; }
     }
 
     public class winchDirection
@@ -86,6 +115,8 @@ namespace MSFS_Cloud_Assistant
         public double heading { get; set; }
         public double pitch { get; set; }
         public double distance { get; set; }
+        public double groundDistance { get; set; }
+        public double climbAngle { get; set; }
         public Vector3 localForceDirection { get; set; }
     }
 
