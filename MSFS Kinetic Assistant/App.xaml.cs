@@ -1,6 +1,6 @@
 ﻿using System.Windows;
 
-namespace MSFS_Cloud_Assistant
+namespace MSFS_Kinetic_Assistant
 {
     /// <summary>
     /// Interaction logic for App.xaml

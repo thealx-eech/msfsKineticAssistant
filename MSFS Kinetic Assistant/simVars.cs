@@ -1,4 +1,4 @@
-﻿namespace MSFS_Cloud_Assistant
+﻿namespace MSFS_Kinetic_Assistant
 {
     class SimVars
     {

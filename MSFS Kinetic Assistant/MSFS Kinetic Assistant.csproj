@@ -6,8 +6,8 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{69E1DCFD-A320-4266-ABFE-29CCAE4BDAB3}</ProjectGuid>
     <OutputType>WinExe</OutputType>
-    <RootNamespace>MSFS_Cloud_Assistant</RootNamespace>
-    <AssemblyName>MSFS Cloud Assistant</AssemblyName>
+    <RootNamespace>MSFS_Kinetic_Assistant</RootNamespace>
+    <AssemblyName>MSFS Kinetic Assistant</AssemblyName>
     <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <ProjectTypeGuids>{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>

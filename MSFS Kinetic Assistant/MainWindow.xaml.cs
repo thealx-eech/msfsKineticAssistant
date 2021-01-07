@@ -25,7 +25,7 @@ using Microsoft.Win32;
 //(A:TOW RELEASE HANDLE, percent)/
 //(A:LIGHT WING,         percent)/
 
-namespace MSFS_Cloud_Assistant
+namespace MSFS_Kinetic_Assistant
 {
     public partial class MainWindow : System.Windows.Window
     {
@@ -135,7 +135,7 @@ namespace MSFS_Cloud_Assistant
                 try
                 {
                     _fsConnect = new FsConnect();
-                    _fsConnect.Connect("Cloud Assistant", "127.0.0.1", 500, SimConnectProtocol.Ipv4);
+                    _fsConnect.Connect("Kinetic Assistant", "127.0.0.1", 500, SimConnectProtocol.Ipv4);
                 }
                 catch (Exception ex)
                 {
@@ -148,7 +148,7 @@ namespace MSFS_Cloud_Assistant
                 Console.WriteLine("Initializing data definitions");
                 InitializeDataDefinitions(_fsConnect);
 
-                showMessage("Cloud Assistant connected", _fsConnect);
+                showMessage("Kinetic Assistant connected", _fsConnect);
                 Application.Current.Dispatcher.Invoke(() => playSound("true"));
                 changeButtonStatus(true, connectButton, true, "DISCONNECT");
                 changeButtonStatus(true, launchPrepareButton, true);
@@ -165,7 +165,7 @@ namespace MSFS_Cloud_Assistant
             {
                 try
                 {
-                    showMessage("Cloud Assistant disconnected", _fsConnect);
+                    showMessage("Kinetic Assistant disconnected", _fsConnect);
                     Application.Current.Dispatcher.Invoke(() => playSound("error"));
                     _fsConnect.Disconnect();
                     _fsConnect.Dispose();
@@ -589,17 +589,28 @@ namespace MSFS_Cloud_Assistant
                 string content = File.ReadAllText(openFileDialog.FileName);
                 foreach(string line in content.Split( new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None) )
                 { // Location,,thermal,40.17048,-111.96616,5000,11.95587,10,,,250,2021-01-04T23:32:47.770,
-                    string[] data = line.Split(',');
-                    if (data.Length > 7 && data[2].ToLower() == "thermal")
+                    if (!String.IsNullOrWhiteSpace(line))
                     {
-                        if (double.TryParse(data[3], out double lat) &&
-                            double.TryParse(data[4], out double lng) &&
-                            double.TryParse(data[5], out double alt) &&
-                            double.TryParse(data[7], out double radius))
+                        string[] data = line.Split(',');
+                        if (data.Length > 7 && data[2].ToLower() == "thermal")
                         {
-                            winchPosition _thermalPosition = new winchPosition(new GeoLocation(lat / 180 * Math.PI, lng / 180 * Math.PI), 0.305 * alt, 1852 * radius);
+                            if (double.TryParse(data[3], out double lat) &&
+                                double.TryParse(data[4], out double lng) &&
+                                double.TryParse(data[5], out double alt) &&
+                                double.TryParse(data[7], out double radius))
+                            {
+                                winchPosition _thermalPosition = new winchPosition(new GeoLocation(lat / 180 * Math.PI, lng / 180 * Math.PI), 0.305 * alt, 1852 * radius);
 
-                            thermalsList.Add(_thermalPosition);
+                                thermalsList.Add(_thermalPosition);
+                            }
+                            else
+                            {
+                                MessageBox.Show("Userpoint record numbers format is incorrect");
+                            }
+                        }
+                        else
+                        {
+                            MessageBox.Show("Userpoint record does not have enough parameters");
                         }
                     }
                 }
