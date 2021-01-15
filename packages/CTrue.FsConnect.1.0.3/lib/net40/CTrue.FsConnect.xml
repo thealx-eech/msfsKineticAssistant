@@ -34,7 +34,7 @@
         <member name="M:CTrue.FsConnect.FsConnect.RegisterDataDefinition``1(System.Enum,System.Collections.Generic.List{CTrue.FsConnect.SimProperty})">
             <inheritdoc />
         </member>
-        <member name="M:CTrue.FsConnect.FsConnect.RequestData(System.Enum,System.Enum)">
+        <member name="M:CTrue.FsConnect.FsConnect.RequestData(System.Enum,System.Enum,System.UInt32,Microsoft.FlightSimulator.SimConnect.SIMCONNECT_SIMOBJECT_TYPE)">
             <inheritdoc />
         </member>
         <member name="M:CTrue.FsConnect.FsConnect.UpdateData``1(System.Enum,``0)">
@@ -162,7 +162,7 @@
             Disconnects from Flight Simulator.
             </summary>
         </member>
-        <member name="M:CTrue.FsConnect.IFsConnect.RequestData(System.Enum,System.Enum)">
+        <member name="M:CTrue.FsConnect.IFsConnect.RequestData(System.Enum,System.Enum,System.UInt32,Microsoft.FlightSimulator.SimConnect.SIMCONNECT_SIMOBJECT_TYPE)">
             <summary>
             Requests data from Flight Simulator.
             </summary>

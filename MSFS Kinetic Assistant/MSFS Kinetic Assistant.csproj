@@ -125,6 +125,7 @@
       <DependentUpon>App.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="NearbyInfoResponse.cs" />
     <Compile Include="PlaneInfoRotate.cs" />
     <Compile Include="SimvarsViewModel.cs" />
     <Compile Include="simVars.cs" />
@@ -199,6 +200,7 @@
   <ItemGroup>
     <Content Include="error.wav" />
     <Content Include="false.wav" />
+    <Resource Include="tow.bmp" />
     <Content Include="true.wav" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

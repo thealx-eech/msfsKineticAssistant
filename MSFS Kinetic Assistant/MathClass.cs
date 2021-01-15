@@ -24,7 +24,7 @@ namespace MSFS_Kinetic_Assistant
             Vector3 globalToWinchNorm = globalToWinch;
             globalToWinchNorm.Normalize();
             
-            _winchDirection.climbAngle = - Math.Asin(globalToWinchNorm.Y);
+            _winchDirection.climbAngle = Math.Abs(Math.Asin(globalToWinchNorm.Y));
 
             Matrix3x3 attitude = Matrix3x3.CreateFromYawPitchRoll((float)_planeInfoResponse.PlaneHeading, (float)_planeInfoResponse.PlanePitch, (float)_planeInfoResponse.PlaneBank);
             _winchDirection.localForceDirection = Matrix3x3.Multiply(attitude.Inverse(), globalToWinchNorm);
@@ -74,15 +74,16 @@ namespace MSFS_Kinetic_Assistant
             return speed;
         }
 
-        public double getCableTension(double cableLength, double elasticExtension,winchDirection _winchDirection, double lastFrameTiming)
+        public double getCableTension(double cableLength, double elasticExtension,winchDirection _winchDirection, double lastFrameTiming, double tensionLimit)
         {
             double cableTension = 0;
-            double dumpingLength = cableLength * elasticExtension / 100;
+            double dumpingLength = Math.Max(5.0, cableLength * elasticExtension / 100);
             if (cableLength < _winchDirection.distance)
             {
                 if (cableLength + dumpingLength < _winchDirection.distance) // CABLE FAILURE
                 {
-                    cableTension = 6 * 9.81;
+                    Console.WriteLine($"String failure: {cableLength + dumpingLength:F2} / {_winchDirection.distance:F2}" );
+                    cableTension = 1.1 * tensionLimit;
                 }
                 else
                 {
@@ -98,16 +99,22 @@ namespace MSFS_Kinetic_Assistant
     public class winchPosition
     {
         public winchPosition() { }
-        public winchPosition(GeoLocation Location, double Altitude, double Radius = 0)
+        public winchPosition(GeoLocation Location, double Altitude, double Radius = 0, double Airspeed = 0, string Title = "", string Category = "")
         {
             location = Location;
             alt = Altitude;
             radius = Radius;
+            airspeed = Airspeed;
+            title = Title;
+            category = Category;
         }
 
         public GeoLocation location { get; set; }
         public double alt { get; set; }
         public double radius { get; set; }
+        public double airspeed { get; set; }
+        public string title { get; set; }
+        public string category { get; set; }
     }
 
     public class winchDirection

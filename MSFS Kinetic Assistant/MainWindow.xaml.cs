@@ -25,6 +25,9 @@ using Microsoft.Win32;
 //(A:TOW RELEASE HANDLE, percent)/
 //(A:LIGHT WING,         percent)/
 
+//FOLDING WING LEFT PERCENT
+//FOLDING WING RIGHT PERCENT
+
 namespace MSFS_Kinetic_Assistant
 {
     public partial class MainWindow : System.Windows.Window
@@ -35,6 +38,9 @@ namespace MSFS_Kinetic_Assistant
         public PlaneInfoCommit _planeCommit;
         public PlaneInfoCommit _planeCommitLast;
         public PlaneInfoRotate _planeRotate;
+        public Dictionary<uint, winchPosition> _nearbyInfoResponse;
+        public Dictionary<uint, winchPosition> _nearbyInfoResponseLast;
+        public Dictionary<uint, winchPosition> _nearbyInfoResponsePreLast;
 
         // IF NOT NULL - READY TO LAUNCH
         public winchPosition _winchPosition = null;
@@ -53,6 +59,11 @@ namespace MSFS_Kinetic_Assistant
 
         // IF NOT FALSE - THERMALS CALCULATION IN PROCESS
         public bool thermalsWorking = false;
+
+        // IF NOT NULL - TOWING ACTIVE
+        public uint towingTarget = 99999999;
+        public double towCableLength = 0;
+        bool towingScanning = false;
 
         bool winchAbortInitiated = false;
         bool launchpadAbortInitiated = false;
@@ -78,6 +89,11 @@ namespace MSFS_Kinetic_Assistant
             _mathClass = new MathClass();
             assistantSettings = new Dictionary<string, double>();
 
+            _nearbyInfoResponse = new Dictionary<uint, winchPosition>();
+            _nearbyInfoResponseLast = new Dictionary<uint, winchPosition>();
+            _nearbyInfoResponsePreLast = new Dictionary<uint, winchPosition>();
+
+
             // PREPARE CONTROLS DATA
             controlTimestamps = new Dictionary<string, double>();
             foreach (var field in typeof(PlaneInfoResponse).GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public))
@@ -85,6 +101,9 @@ namespace MSFS_Kinetic_Assistant
                     controlTimestamps.Add(field.Name, 0);
 
             InitializeComponent();
+
+            this.Title = ((AssemblyTitleAttribute)Attribute.GetCustomAttribute(Assembly.GetExecutingAssembly(), typeof(AssemblyTitleAttribute), false)).Title + " " +
+            Assembly.GetExecutingAssembly().GetName().Version.ToString();
 
             // COMMON SIM VALUES REQUEST TIMER
             dispatcherTimer = new DispatcherTimer();
@@ -96,6 +115,12 @@ namespace MSFS_Kinetic_Assistant
             dispatcherTimer.Interval = new TimeSpan(0, 0, 0, 0, 50);
             dispatcherTimer.Tick += new EventHandler(launchInterval);
             dispatcherTimer.Start();
+
+            dispatcherTimer = new DispatcherTimer();
+            dispatcherTimer.Interval = new TimeSpan(0, 0, 0, 1);
+            dispatcherTimer.Tick += new EventHandler(nearbyInterval);
+            dispatcherTimer.Start();
+
             loadSettings();
             loaded = true;
         }
@@ -108,8 +133,11 @@ namespace MSFS_Kinetic_Assistant
         {
             if (_fsConnect != null)
             {
-                if (_winchPosition == null && _carrierPosition == null && targedCatapultVelocity == 0 && !thermalsWorking)
+                if (_winchPosition == null && _carrierPosition == null && targedCatapultVelocity == 0 && !thermalsWorking && towingTarget == 99999999)
                     _fsConnect.RequestData(Requests.PlaneInfo, Definitions.PlaneInfo);
+
+                if (towingScanning && towingTarget == 99999999)
+                    _fsConnect.RequestData(Requests.NearbyObjects, Definitions.NearbyObjects, (uint)(assistantSettings["towStringLength"] * 1.5), getTowObjectType());
             }
         }
 
@@ -117,13 +145,34 @@ namespace MSFS_Kinetic_Assistant
         {
             if (_fsConnect != null)
             {
-                if (_winchPosition != null || _carrierPosition != null || targedCatapultVelocity != 0 || thermalsWorking)
+                if (_winchPosition != null || _carrierPosition != null || targedCatapultVelocity != 0 || thermalsWorking || towingTarget != 99999999)
                 {
                     _fsConnect.RequestData(Requests.PlaneInfo, Definitions.PlaneInfo);
                     _fsConnect.RequestData(Requests.PlaneCommit, Definitions.PlaneCommit);
                     _fsConnect.RequestData(Requests.PlaneRotate, Definitions.PlaneRotate);
                 }
+
+                if (towingScanning && towingTarget != 99999999)
+                    _fsConnect.RequestData(Requests.NearbyObjects, Definitions.NearbyObjects, (uint)(assistantSettings["towStringLength"] * 1.5), getTowObjectType());
             }
+        }
+
+        public SIMCONNECT_SIMOBJECT_TYPE getTowObjectType()
+        {
+            switch ((int)assistantSettings["towScanType"])
+            {
+                case 1:
+                    return SIMCONNECT_SIMOBJECT_TYPE.AIRCRAFT;
+                case 2:
+                    return SIMCONNECT_SIMOBJECT_TYPE.GROUND;
+                case 3:
+                    return SIMCONNECT_SIMOBJECT_TYPE.BOAT;
+                case 4:
+                    return SIMCONNECT_SIMOBJECT_TYPE.HELICOPTER;
+                default:
+                    return SIMCONNECT_SIMOBJECT_TYPE.ALL;
+            }
+
         }
 
         public void toggleConnect(object sender, RoutedEventArgs e)
@@ -150,13 +199,12 @@ namespace MSFS_Kinetic_Assistant
 
                 showMessage("Kinetic Assistant connected", _fsConnect);
                 Application.Current.Dispatcher.Invoke(() => playSound("true"));
-                changeButtonStatus(true, connectButton, true, "DISCONNECT");
+                changeButtonStatus(false, connectButton, true, "DISCONNECT");
                 changeButtonStatus(true, launchPrepareButton, true);
                 changeButtonStatus(true, hookPrepareButton, true);
                 changeButtonStatus(true, catapultlaunchButton, true);
-                changeButtonStatus(true, thermalsToggleButton, true); 
-
-
+                changeButtonStatus(true, thermalsToggleButton, true);
+                changeButtonStatus(true, towToggleButton, true);
 
                 _fsConnect.RequestData(Requests.PlaneInfo, Definitions.PlaneInfo);
                 _fsConnect.RequestData(Requests.PlaneCommit, Definitions.PlaneCommit);
@@ -179,11 +227,12 @@ namespace MSFS_Kinetic_Assistant
 
                 Application.Current.Dispatcher.Invoke(() => abortLaunch());
 
-                changeButtonStatus(false, connectButton, true, "CONNECT");
+                changeButtonStatus(true, connectButton, true, "CONNECT");
                 changeButtonStatus(false, launchPrepareButton, false);
                 changeButtonStatus(false, hookPrepareButton, false);
                 changeButtonStatus(false, catapultlaunchButton, false);
                 changeButtonStatus(false, thermalsToggleButton, false);
+                changeButtonStatus(false, towToggleButton, false);
 
                 Console.WriteLine("Disconnected");
             }
@@ -281,12 +330,15 @@ namespace MSFS_Kinetic_Assistant
 
         public void processLaunch()
         {
+            bool applyForces;
+
             if (winchAbortInitiated)
             {
                 _winchPosition = null;
                 launchTime = 0;
                 cableLength = 0;
                 winchAbortInitiated = false;
+                applyForces = true;
             }
             else
             {
@@ -296,13 +348,14 @@ namespace MSFS_Kinetic_Assistant
                 double targetVelocity = 0.514 * assistantSettings["targetSpeed"];
 
                 // GET DRAFT CABLE TENSION
-                double cableTension = _mathClass.getCableTension(cableLength, Math.Max(1, assistantSettings["elasticExtension"]), _winchDirection, lastFrameTiming);
+                double tensionLimit = assistantSettings["enableFailure"] == 1 ? 6 * 9.81 : 60 * 9.81; ;
+                double cableTension = _mathClass.getCableTension(cableLength, Math.Max(1, assistantSettings["elasticExtension"]), _winchDirection, lastFrameTiming, tensionLimit);
 
                 // SHORTEN THE STRING
                 if (launchTime != 0 && launchTime - absoluteTime < 0 && cableLength > 10)
                 {
-                    double pitchCompensation = Math.Cos(_winchDirection.climbAngle);
-                    double tensionMultiplier = Math.Pow(1 - Math.Min(cableTension / (6 * 9.81), 1), 0.75);
+                    double pitchCompensation = Math.Pow(Math.Cos(_winchDirection.climbAngle), 1.25);
+                    double tensionMultiplier = Math.Pow(1 - Math.Min(cableTension / tensionLimit, 1), 0.75);
 
                     double timePassed = -launchTime + absoluteTime;
                     double StartTime = 10;
@@ -317,43 +370,295 @@ namespace MSFS_Kinetic_Assistant
                     }
                 }
 
+                // LEVEL UP GLIDER BEFORE LAUNCH
+                if (_planeInfoResponse.OnAnyRunway == 100 && launchTime != 0 && absoluteTime < launchTime)
+                {
+                    _planeRotate.RotationVelocityBodyX = 0;
+                    _planeRotate.RotationVelocityBodyY = 0;
+                    _planeRotate.RotationVelocityBodyZ = - Math.Sin(_planeInfoResponse.PlaneBank) / Math.Max(1, launchTime - absoluteTime);
+
+                    Console.WriteLine($"Leveling {_planeRotate.RotationVelocityBodyZ:F5}");
+
+                    try
+                    {
+                        _fsConnect.UpdateData(Definitions.PlaneRotate, _planeRotate);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex.Message);
+                    }
+                }
+
+
                 // GET FINAL CABLE TENSION
-                cableTension = _mathClass.getCableTension(cableLength, Math.Max(1, assistantSettings["elasticExtension"]), _winchDirection, lastFrameTiming);
-
-                Console.WriteLine($"Winch: {cableTension/9.81:F2}g {cableLength:F2}m / {_winchDirection.distance:F2}m h{(_winchDirection.heading * 180 / Math.PI):F0}deg p{(_winchDirection.pitch * 180 / Math.PI):F0}deg");
-
-                double angleLimit = 89 * Math.PI / 180;
-                if (assistantSettings["enableFailure"] == 1 && cableTension >= 6 * 9.81 || _winchDirection.heading < -angleLimit || _winchDirection.heading > angleLimit || _winchDirection.pitch < -angleLimit || _winchDirection.pitch > angleLimit)
-                {
-                    showMessage(assistantSettings["enableFailure"] == 1 && cableTension >= 6 * 9.81 ?
-                        "Whinch cable failure" :
-                        "Winch cable released. Gained altitude: " + (_planeInfoResponse.Altitude - _winchPosition.alt).ToString("0.0") + " meters", _fsConnect);
-                    Application.Current.Dispatcher.Invoke(() => playSound("false"));
-                    winchAbortInitiated = true;
-
-                    Application.Current.Dispatcher.Invoke(() => abortLaunch());
-                }
-                else if (cableTension != 0)
-                {
-                    _planeCommit.VelocityBodyX += _winchDirection.localForceDirection.X * cableTension * lastFrameTiming;
-                    _mathClass.restrictAirspeed(_planeCommit.VelocityBodyX, targetVelocity, lastFrameTiming);
-                    _planeCommit.VelocityBodyY += _winchDirection.localForceDirection.Y * cableTension * lastFrameTiming;
-                    _mathClass.restrictAirspeed(_planeCommit.VelocityBodyY, targetVelocity, lastFrameTiming);
-                    _planeCommit.VelocityBodyZ += _winchDirection.localForceDirection.Z * cableTension * lastFrameTiming;
-                    _mathClass.restrictAirspeed(_planeCommit.VelocityBodyZ, targetVelocity, lastFrameTiming);
-                }
+                cableTension = _mathClass.getCableTension(cableLength, Math.Max(1, assistantSettings["elasticExtension"]), _winchDirection, lastFrameTiming, tensionLimit);
+                applyForces = applyWinchForces(cableTension, tensionLimit, _winchDirection, targetVelocity, "Winch", assistantSettings["connectionPoint"]);
             }
 
-            try
+            if (applyForces)
             {
-                _fsConnect.UpdateData(Definitions.PlaneCommit, _planeCommit);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
+                try
+                {
+                    _fsConnect.UpdateData(Definitions.PlaneCommit, _planeCommit);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.Message);
+                }
             }
         }
+
+        public bool applyWinchForces(double cableTension, double tensionLimit, winchDirection _winchDirection, double targetVelocity, string type, double connectionPoint)
+        {
+            Console.WriteLine($"{type}: {cableTension / 9.81:F2}g {cableLength:F2}m / {_winchDirection.distance:F2}m h{(_winchDirection.heading * 180 / Math.PI):F0}deg p{(_winchDirection.pitch * 180 / Math.PI):F0}deg");
+
+            double angleLimit = 89 * Math.PI / 180;
+            if (cableTension > tensionLimit || _winchDirection.heading < -angleLimit || _winchDirection.heading > angleLimit || _winchDirection.pitch < -angleLimit || _winchDirection.pitch > angleLimit)
+            {
+                showMessage(assistantSettings["enableFailure"] == 1 && cableTension >= tensionLimit ?
+                    type + " cable failure" :
+                    type + " cable released" + (type == "Winch" ? ". Gained altitude: " + (_planeInfoResponse.Altitude - _winchPosition.alt).ToString("0.0") + " meters" : ""), _fsConnect);
+
+                if (type == "Winch")
+                {
+                    Application.Current.Dispatcher.Invoke(() => playSound("false"));
+                    winchAbortInitiated = true;
+                    Application.Current.Dispatcher.Invoke(() => abortLaunch());
+                }
+                else if (type == "Tow")
+                {
+                    towingTarget = 99999999;
+                    towCableLength = 0;
+                    Application.Current.Dispatcher.Invoke(() => playSound("false"));
+                }
+            }
+            else if (cableTension != 0)
+            {
+                _planeCommit.VelocityBodyX += _winchDirection.localForceDirection.X * cableTension * lastFrameTiming;
+                _mathClass.restrictAirspeed(_planeCommit.VelocityBodyX, targetVelocity, lastFrameTiming);
+                _planeCommit.VelocityBodyY += _winchDirection.localForceDirection.Y * cableTension * lastFrameTiming;
+                _mathClass.restrictAirspeed(_planeCommit.VelocityBodyY, targetVelocity, lastFrameTiming);
+                _planeCommit.VelocityBodyZ += _winchDirection.localForceDirection.Z * cableTension * lastFrameTiming;
+                _mathClass.restrictAirspeed(_planeCommit.VelocityBodyZ, targetVelocity, lastFrameTiming);
+
+                // PROCESS NOSE CONNECTION POINT
+                double degree5 = 5 * Math.PI / 180;
+                if (cableTension > 9.81 / 2 && connectionPoint != 0 && (Math.Abs(_winchDirection.pitch) > degree5 || Math.Abs(_winchDirection.heading) > degree5))
+                {
+                    double rotationForce = 10 * (cableTension - 9.81 / 2) / tensionLimit;
+
+                    _planeRotate.RotationVelocityBodyX = (_planeRotate.RotationVelocityBodyX - rotationForce * Math.Sin(_winchDirection.pitch)) * lastFrameTiming;
+                    _planeRotate.RotationVelocityBodyY = (_planeRotate.RotationVelocityBodyX + rotationForce * Math.Sin(_winchDirection.heading)) * lastFrameTiming;
+                    _planeRotate.RotationVelocityBodyZ = 0;
+
+                    Console.WriteLine($"Pitch {_planeRotate.RotationVelocityBodyX:F2} Heading {_planeRotate.RotationVelocityBodyY:F2}");
+
+                    try
+                    {
+                        _fsConnect.UpdateData(Definitions.PlaneRotate, _planeRotate);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex.Message);
+                    }
+                }
+
+                return true;
+            }
+
+            return false;
+        }
         // WINCH END
+
+        // TOW START
+        public void toggleScanning(object sender, RoutedEventArgs e)
+        {
+            Console.WriteLine("toggleScanning");
+
+            if (!validConnection())
+            {
+                Console.WriteLine("connection lost");
+                Application.Current.Dispatcher.Invoke(() => abortLaunchpad());
+            }
+            else
+            {
+                if (towingScanning == false) // PREPARE TO LAUNCH
+                {
+                    towingScanning = true;
+                    Application.Current.Dispatcher.Invoke(() => changeButtonStatus(false, towToggleButton, true, "Deactivate Aerotow"));
+
+                    scanningResults.Visibility = Visibility.Visible;
+                    Application.Current.MainWindow.Height = 800;
+                }
+                else
+                {
+                    towingScanning = false;
+
+                    if (towingTarget != 99999999)
+                    {
+                        toggleTowCable(towingTarget);
+                    }
+
+                    Application.Current.Dispatcher.Invoke(() => nearbyObjects.Children.Clear());
+                    Application.Current.Dispatcher.Invoke(() => farObjects.Children.Clear());
+                    Application.Current.Dispatcher.Invoke(() => currentTarget.Children.Clear());
+                    Application.Current.Dispatcher.Invoke(() => changeButtonStatus(true, towToggleButton, true, "Activate Aerotow"));
+
+                    scanningResults.Visibility = Visibility.Collapsed;
+                    Application.Current.MainWindow.Height = 400;
+                }
+            }
+        }
+        public void nearbyInterval(object sender, EventArgs e)
+        {
+            if (_fsConnect != null)
+            {
+                if (towingScanning && _nearbyInfoResponse.Count > 0)
+                {
+                    bool abort = false;
+                    nearbyObjects.Children.Clear();
+                    farObjects.Children.Clear();
+                    currentTarget.Children.Clear();
+
+                    try
+                    {
+                        foreach (KeyValuePair<uint, winchPosition> obj in new Dictionary<uint, winchPosition>(_nearbyInfoResponse))
+                        {
+                            if (obj.Key.ToString() == "1")
+                                continue;
+
+                            // FILTER OUT CATEGORIES
+                            if (getTowObjectType() == SIMCONNECT_SIMOBJECT_TYPE.ALL)
+                            {
+                                switch (obj.Value.category.ToLower())
+                                {
+                                    case "airplane":
+                                    case "groundvehicle":
+                                    case "staticobject":
+                                    case "human":
+                                    case "boat":
+                                    case "":
+                                        continue;
+                                }
+                            }
+
+                            winchDirection dir = _mathClass.getForceDirection(obj.Value, _planeInfoResponse);
+
+                            Button label = new Button();
+                            label.Tag = obj.Key.ToString();
+                            label.FontSize = 10;
+                            label.Background = new SolidColorBrush(Colors.Transparent);
+
+                            string title = obj.Value.category + " " + obj.Value.title.Replace("_", " ");
+                            label.Content = (obj.Key + " " + title).Substring(0, Math.Min(title.Length, 40)) + " (" + dir.distance.ToString(".0m") + ")";
+
+                            if (dir.distance > 5.0 && dir.distance <= assistantSettings["towStringLength"] || obj.Key == towingTarget)
+                            {
+                                label.Foreground = new SolidColorBrush(obj.Key == towingTarget ? Colors.DarkRed : Colors.DarkGreen);
+                                label.BorderBrush = new SolidColorBrush(obj.Key == towingTarget ? Colors.DarkRed : Colors.DarkGreen);
+                                label.Cursor = Cursors.Arrow;
+                                label.Margin = new Thickness(5, 5, 5, 5);
+                                label.Height = 26;
+                                label.Click += attachTowCable;
+                                label.Cursor = Cursors.Hand;
+
+                                if (obj.Key == towingTarget)
+                                    currentTarget.Children.Add(label);
+                                else
+                                    nearbyObjects.Children.Add(label);
+                            }
+                            else if (dir.distance <= 1.5 * assistantSettings["towStringLength"])
+                            {
+                                label.Margin = new Thickness(5, 1, 5, 1);
+                                label.IsEnabled = false;
+                                farObjects.Children.Add(label);
+                            }
+
+                            if (_nearbyInfoResponseLast.ContainsKey(obj.Key)) { _nearbyInfoResponsePreLast[obj.Key] = _nearbyInfoResponseLast[obj.Key]; }
+                            if (_nearbyInfoResponse.ContainsKey(obj.Key)) { _nearbyInfoResponseLast[obj.Key] = _nearbyInfoResponse[obj.Key]; }
+
+                            // CHECK CURRENT TARGET EXISTANCE
+                            if (towingTarget != 99999999 && 
+                                !_nearbyInfoResponse.ContainsKey(towingTarget) && !_nearbyInfoResponseLast.ContainsKey(towingTarget) && !_nearbyInfoResponsePreLast.ContainsKey(towingTarget))
+                                abort = true;
+
+                            if (abort)
+                            {
+                                Console.WriteLine("Tow plane lost");
+                                toggleTowCable(towingTarget);
+                            }
+
+                            _nearbyInfoResponse = new Dictionary<uint, winchPosition>();
+                        }
+                    } catch(Exception ex) { Console.WriteLine(ex.Message); }
+
+                }
+            }
+        }
+
+        public void attachTowCable(object sender, EventArgs e)
+        {
+            if (uint.TryParse(((Button)sender).Tag.ToString(), out uint id)) {
+                toggleTowCable(id);
+            }
+        }
+
+        public void toggleTowCable(uint id)
+        {
+            if (towingTarget == id)
+            {
+                towingTarget = 99999999;
+                towCableLength = 0;
+
+                showMessage("Tow string released", _fsConnect);
+                Application.Current.Dispatcher.Invoke(() => playSound("false"));
+            }
+            else if (_planeInfoResponse.SimOnGround == 100 || _planeInfoResponse.AltitudeAboveGround <= _planeInfoResponse.StaticCGtoGround * 1.25 && 
+                _nearbyInfoResponse.ContainsKey(id))
+            {
+                towingTarget = id;
+                winchPosition position = _nearbyInfoResponse[id];
+                winchDirection direction = _mathClass.getForceDirection(position, _planeInfoResponse);
+                towCableLength = direction.distance + 5;
+
+                showMessage("Tow string connected", _fsConnect);
+                Application.Current.Dispatcher.Invoke(() => playSound("false"));
+            }
+
+            nearbyInterval(new object(), new EventArgs());
+        }
+
+        public void processTowing()
+        {
+            Console.WriteLine("processTowing");
+
+            if (_nearbyInfoResponse.ContainsKey(towingTarget))
+            {
+                // GET ANGLE TO TUG POSITION
+                winchPosition winchPosition = _nearbyInfoResponse[towingTarget];
+                winchDirection winchDirection = _mathClass.getForceDirection(winchPosition, _planeInfoResponse);
+
+                // GET FINAL CABLE TENSION
+                double tensionLimit = assistantSettings["enableFailure"] == 1 ? 8 * 9.81 : 20 * 9.81;
+                double cableTension = _mathClass.getCableTension(towCableLength, Math.Max(1, assistantSettings["towElasticExtension"]), winchDirection, lastFrameTiming, tensionLimit);
+                double targetVelocity = winchPosition.airspeed > 25 ? winchPosition.airspeed * 2 : 50;
+
+                if (applyWinchForces(cableTension, tensionLimit, winchDirection, targetVelocity, "Tow", assistantSettings["towConnectionPoint"]))
+                {
+                    try
+                    {
+                        _fsConnect.UpdateData(Definitions.PlaneCommit, _planeCommit);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex.Message);
+                    }
+                }
+            }
+        }
+
+        // TOW END
+
 
         // LAUNCHPAD START
         public void toggleLaunchpadPrepare(object sender, RoutedEventArgs e)
@@ -520,9 +825,10 @@ namespace MSFS_Kinetic_Assistant
                     double accel = _planeCommit.VelocityBodyZ - _planeCommitLast.VelocityBodyZ;
 
                     double cableTension = 0;
+                    double tensionLimit = 5 * 9.81;
                     // ARREST IN PROCESS - FIND OUT TENSION
                     cableTension = 1.2 * (_planeCommit.VelocityBodyZ * lastFrameTiming / (timeLeft / 1.5) + (accel > 0 ? accel : 0));
-                    cableTension = Math.Min(9.81 * 5 * lastFrameTiming, cableTension);
+                    cableTension = Math.Min(tensionLimit * lastFrameTiming, cableTension);
 
                     //Console.WriteLine("TAIL HOOK " + (_planeInfoResponse.AltitudeAboveGround - _planeInfoResponse.StaticCGtoGround));
                     Console.WriteLine($"String: cableTension{cableTension / lastFrameTiming:F2} timeLeft{timeLeft:F2} {_carrierDirection.distance:F2}m h{(_carrierDirection.heading * 180 / Math.PI):F0}deg p{(_carrierDirection.pitch * 180 / Math.PI):F0}deg");
@@ -594,13 +900,16 @@ namespace MSFS_Kinetic_Assistant
                         string[] data = line.Split(',');
                         if (data.Length > 7 && data[2].ToLower() == "thermal")
                         {
+                            double radius;
+                            double strength = 15;
+
                             if (double.TryParse(data[3], out double lat) &&
                                 double.TryParse(data[4], out double lng) &&
                                 double.TryParse(data[5], out double alt) &&
-                                double.TryParse(data[7], out double radius))
+                                (data[7].Contains(" ") && double.TryParse(data[7].Split(' ')[0], out radius) && double.TryParse(data[7].Split(' ')[1], out strength) ||
+                                double.TryParse(data[7], out radius)))
                             {
-                                winchPosition _thermalPosition = new winchPosition(new GeoLocation(lat / 180 * Math.PI, lng / 180 * Math.PI), 0.305 * alt, 1852 * radius);
-
+                                winchPosition _thermalPosition = new winchPosition(new GeoLocation(lat / 180 * Math.PI, lng / 180 * Math.PI), 0.305 * alt, 1852 * radius, strength / 1.9);
                                 thermalsList.Add(_thermalPosition);
                             }
                             else
@@ -650,38 +959,63 @@ namespace MSFS_Kinetic_Assistant
         public void processThermals()
         {
             int id = 0;
-            foreach (winchPosition thermal in thermalsList)
-            {
-                //Console.WriteLine(_planeInfoResponse.AltitudeAboveGround + " " + thermal.alt);
-                if (_planeInfoResponse.AltitudeAboveGround < thermal.alt && thermal.radius > 0)
+            Application.Current.Dispatcher.Invoke(() => thermalsLog.Children.Clear());
+
+            if (_planeCommit.VelocityBodyZ < 100) {
+                foreach (winchPosition thermal in thermalsList)
                 {
-                    winchPosition thermalTemp = new winchPosition(thermal.location, thermal.alt, thermal.radius);
-                    thermalTemp.alt = _planeInfoResponse.Altitude - 10 * thermalTemp.radius;
-                    winchDirection _thermalDirection = _mathClass.getForceDirection(thermalTemp, _planeInfoResponse);
+                    double inversionLayer = 500 * 0.305;
+                    double topEdge = thermal.alt + inversionLayer;
 
-                    if (_thermalDirection.groundDistance < thermalTemp.radius)
+                    //Console.WriteLine(_planeInfoResponse.AltitudeAboveGround + " " + thermal.alt);
+                    if (_planeInfoResponse.AltitudeAboveGround < topEdge && thermal.radius > 0)
                     {
-                        double force = - Math.Pow(1 - _thermalDirection.groundDistance / thermalTemp.radius, 0.5) * Math.Abs(Math.Cos(_planeInfoResponse.PlaneBank)) * Math.Abs(Math.Cos(_planeInfoResponse.PlanePitch));
-                        force *= 3;
+                        winchPosition thermalTemp = new winchPosition(thermal.location, topEdge, thermal.radius);
+                        thermalTemp.alt = _planeInfoResponse.Altitude - 10 * thermalTemp.radius;
+                        winchDirection _thermalDirection = _mathClass.getForceDirection(thermalTemp, _planeInfoResponse);
 
-                        Console.WriteLine("Thermal: " + _thermalDirection.localForceDirection.X * force + " " + _thermalDirection.localForceDirection.Y * force + " " + _thermalDirection.localForceDirection.Z * force);
-
-                        _planeCommit.VelocityBodyX += _thermalDirection.localForceDirection.X * force * lastFrameTiming;
-                        _planeCommit.VelocityBodyY += _thermalDirection.localForceDirection.Y * force * lastFrameTiming;
-                        _planeCommit.VelocityBodyZ += _thermalDirection.localForceDirection.Z * force * lastFrameTiming;
-
-                        try
+                        if (_thermalDirection.groundDistance < thermalTemp.radius)
                         {
-                            _fsConnect.UpdateData(Definitions.PlaneCommit, _planeCommit);
+                            double horizontalModifier = Math.Pow(1 - _thermalDirection.groundDistance / thermalTemp.radius, 0.25); // DISTANCE TO THE CENTER
+                            double verticalModifier = _planeInfoResponse.AltitudeAboveGround < topEdge - inversionLayer ?
+                                Math.Pow(_planeInfoResponse.AltitudeAboveGround / (topEdge - inversionLayer), 0.25) : // DISTANCE TO THE TOP + INVERSION
+                                (topEdge - _planeInfoResponse.AltitudeAboveGround - inversionLayer / 2 ) / (inversionLayer / 2); // ABOVE INVERSION
+                            double pitchBankModifier = Math.Abs(Math.Cos(_planeInfoResponse.PlaneBank)) * Math.Abs(Math.Cos(_planeInfoResponse.PlanePitch)); // ROTATION
+                            double airspeedModifier = Math.Pow(1 - _planeCommit.VelocityBodyZ / 100, 0.25); // ATTEMPT TO PREVENT OVERSPEED
+
+                            double finalModifier = horizontalModifier * verticalModifier * pitchBankModifier * airspeedModifier;
+
+                            double liftAmount = - thermal.airspeed * finalModifier;
+                            _planeCommit.WaterRudderHandlePosition = horizontalModifier * verticalModifier * 100;
+
+                            _planeCommit.VelocityBodyX += _thermalDirection.localForceDirection.X * liftAmount * lastFrameTiming;
+                            _planeCommit.VelocityBodyY += _thermalDirection.localForceDirection.Y * liftAmount * lastFrameTiming;
+                            _planeCommit.VelocityBodyZ += _thermalDirection.localForceDirection.Z * liftAmount * lastFrameTiming;
+
+                            // FORWARD SPEED COMPENSATION
+                            _planeCommit.VelocityBodyZ += _planeCommit.VelocityBodyZ * Math.Pow(lastFrameTiming, 2.5) * horizontalModifier * verticalModifier * airspeedModifier;
+
+                            try
+                            {
+                                _fsConnect.UpdateData(Definitions.PlaneCommit, _planeCommit);
+
+                                Application.Current.Dispatcher.Invoke(() => thermalsLog.Children.Add(makeTextBlock("Thermal #" + id + Environment.NewLine, Colors.Black)));
+                                Application.Current.Dispatcher.Invoke(() => thermalsLog.Children.Add(makeTextBlock($"To center:  {_thermalDirection.groundDistance:F0}m mod: {horizontalModifier:F2}", Colors.Black)));
+                                Application.Current.Dispatcher.Invoke(() => thermalsLog.Children.Add(makeTextBlock($"To top:     {(thermal.alt - _planeInfoResponse.AltitudeAboveGround):F0}m mod: {verticalModifier:F2}", (thermal.alt - _planeInfoResponse.AltitudeAboveGround) > 0 ? Colors.Black : Colors.DarkRed)));
+                                Application.Current.Dispatcher.Invoke(() => thermalsLog.Children.Add(makeTextBlock($"Pitch/bank mod: {pitchBankModifier:F2}", Colors.Black)));
+                                Application.Current.Dispatcher.Invoke(() => thermalsLog.Children.Add(makeTextBlock($"Velocity:   {_planeCommit.VelocityBodyZ:F0}m/s mod: {airspeedModifier:F2}", Colors.Black)));
+                                Application.Current.Dispatcher.Invoke(() => thermalsLog.Children.Add(makeTextBlock($"Total lift: {-liftAmount:F2}m/s mod: {finalModifier:F2}" + Environment.NewLine, finalModifier > 0 ? Colors.Black : Colors.DarkRed)));
+
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine(ex.Message);
+                            }
                         }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine(ex.Message);
-                        }
+
+                        id++;
                     }
-               }
-
-                id++;
+                }
             }
         }
         // THERMALS END
@@ -695,7 +1029,7 @@ namespace MSFS_Kinetic_Assistant
                 if (e.RequestId == (uint)Requests.PlaneInfo)
                 {
                     //Console.WriteLine(JsonConvert.SerializeObject(e.Data, Formatting.Indented));
-                    _planeInfoResponse = (PlaneInfoResponse)e.Data;
+                    _planeInfoResponse = (PlaneInfoResponse)(e.Data);
 
                     absoluteTime = _planeInfoResponse.AbsoluteTime;
 
@@ -750,6 +1084,23 @@ namespace MSFS_Kinetic_Assistant
                 {
                     //Console.WriteLine(JsonConvert.SerializeObject(e.Data, Formatting.Indented));
                     _planeRotate = (PlaneInfoRotate)e.Data;
+                }
+                // NEARBY DATA
+                else if (e.RequestId == (uint)Requests.NearbyObjects)
+                {
+                    //Console.WriteLine(e.ObjectID);
+                    //Console.WriteLine(JsonConvert.SerializeObject(e.Data, Formatting.Indented));
+                    NearbyInfoResponse response = (NearbyInfoResponse)e.Data;
+                    
+                    if (_nearbyInfoResponseLast.ContainsKey(e.ObjectID)) { _nearbyInfoResponsePreLast[e.ObjectID] = _nearbyInfoResponseLast[e.ObjectID]; }
+                    if (_nearbyInfoResponse.ContainsKey(e.ObjectID)) { _nearbyInfoResponseLast[e.ObjectID] = _nearbyInfoResponse[e.ObjectID]; }
+                    _nearbyInfoResponse[e.ObjectID] = new winchPosition(new GeoLocation(response.Latitude, response.Longitude), response.Altitude, 0, response.Airspeed, response.Title, response.Category);
+
+                    // TOWING IN PROCESS
+                    if (towingTarget == e.ObjectID)
+                    {
+                        processTowing();
+                    }
                 }
                 else
                 {
@@ -820,6 +1171,7 @@ namespace MSFS_Kinetic_Assistant
             definition.Add(new SimProperty(FsSimVar.PlaneBank, FsUnit.Radians, SIMCONNECT_DATATYPE.FLOAT64));
             definition.Add(new SimProperty(FsSimVar.SimOnGround, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
             definition.Add(new SimProperty(FsSimVar.BrakeParkingPosition, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
+            definition.Add(new SimProperty(FsSimVar.OnAnyRunway, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
             // LIGHT STUFF
             definition.Add(new SimProperty(FsSimVar.LIGHTPANEL, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
             definition.Add(new SimProperty(FsSimVar.LIGHTSTROBE, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
@@ -838,23 +1190,33 @@ namespace MSFS_Kinetic_Assistant
             fsConnect.RegisterDataDefinition<PlaneInfoResponse>(Definitions.PlaneInfo, definition);
 
             List<SimProperty> cDefinition = new List<SimProperty>();
-            cDefinition.Add(new SimProperty(FsSimVar.Title, FsUnit.None, SIMCONNECT_DATATYPE.STRING256));
-            cDefinition.Add(new SimProperty(FsSimVar.VelocityBodyX, FsUnit.Radians, SIMCONNECT_DATATYPE.FLOAT64));
-            cDefinition.Add(new SimProperty(FsSimVar.VelocityBodyY, FsUnit.Radians, SIMCONNECT_DATATYPE.FLOAT64));
-            cDefinition.Add(new SimProperty(FsSimVar.VelocityBodyZ, FsUnit.Radians, SIMCONNECT_DATATYPE.FLOAT64));
+            cDefinition.Add(new SimProperty(FsSimVar.VelocityBodyX, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
+            cDefinition.Add(new SimProperty(FsSimVar.VelocityBodyY, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
+            cDefinition.Add(new SimProperty(FsSimVar.VelocityBodyZ, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
             cDefinition.Add(new SimProperty(FsSimVar.AbsoluteTime, FsUnit.Second, SIMCONNECT_DATATYPE.FLOAT64));
             cDefinition.Add(new SimProperty(FsSimVar.TailhookPosition, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
             cDefinition.Add(new SimProperty(FsSimVar.LaunchbarPosition, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
+            cDefinition.Add(new SimProperty(FsSimVar.WaterRudderHandlePosition, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
 
             fsConnect.RegisterDataDefinition<PlaneInfoCommit>(Definitions.PlaneCommit, cDefinition);
 
             List<SimProperty> rDefinition = new List<SimProperty>();
-            rDefinition.Add(new SimProperty(FsSimVar.Title, FsUnit.None, SIMCONNECT_DATATYPE.STRING256));
             rDefinition.Add(new SimProperty(FsSimVar.RotationVelocityBodyX, FsUnit.RadianPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
             rDefinition.Add(new SimProperty(FsSimVar.RotationVelocityBodyY, FsUnit.RadianPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
             rDefinition.Add(new SimProperty(FsSimVar.RotationVelocityBodyZ, FsUnit.RadianPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
 
             fsConnect.RegisterDataDefinition<PlaneInfoRotate>(Definitions.PlaneRotate, rDefinition);
+
+            List<SimProperty> nDefinition = new List<SimProperty>();
+            nDefinition.Add(new SimProperty(FsSimVar.Title, FsUnit.None, SIMCONNECT_DATATYPE.STRING256));
+            nDefinition.Add(new SimProperty(FsSimVar.Category, FsUnit.None, SIMCONNECT_DATATYPE.STRING256));
+            nDefinition.Add(new SimProperty(FsSimVar.PlaneLatitude, FsUnit.Radians, SIMCONNECT_DATATYPE.FLOAT64));
+            nDefinition.Add(new SimProperty(FsSimVar.PlaneLongitude, FsUnit.Radians, SIMCONNECT_DATATYPE.FLOAT64));
+            nDefinition.Add(new SimProperty(FsSimVar.PlaneAltitude, FsUnit.Meter, SIMCONNECT_DATATYPE.FLOAT64));
+            nDefinition.Add(new SimProperty(FsSimVar.AirspeedTrue, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
+            
+
+            fsConnect.RegisterDataDefinition<NearbyInfoResponse>(Definitions.NearbyObjects, nDefinition);
         }
 
         public void changeButtonStatus(bool active, Button btn, bool? enabled = null, string text = "")
@@ -1044,6 +1406,16 @@ namespace MSFS_Kinetic_Assistant
                 soundPlayer.Open(new Uri("pack://siteoforigin:,,,/" + soundName + ".wav"));
                 soundPlayer.Play();
             }
+        }
+
+        public TextBlock makeTextBlock(string text, Color color)
+        {
+            TextBlock textblock = new TextBlock();
+            textblock.Text = text;
+            textblock.Foreground = new SolidColorBrush(color);
+            textblock.FontFamily = new FontFamily("Consolas");
+
+            return textblock;
         }
     }
 }

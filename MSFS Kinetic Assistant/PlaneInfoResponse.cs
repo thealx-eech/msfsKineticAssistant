@@ -19,6 +19,7 @@ namespace MSFS_Kinetic_Assistant
         public double PlaneBank;
         public double SimOnGround;
         public double BrakeParkingPosition;
+        public double OnAnyRunway;
 
         public double LIGHTPANEL;
         public double LIGHTSTROBE;
