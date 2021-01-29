@@ -44,22 +44,19 @@ namespace MSFS_Kinetic_Assistant
             return _winchDirection;
         }
 
-        public static GeoLocation FindPointAtDistanceFrom(GeoLocation startPoint, double initialBearingRadians, double distanceKilometres)
+        public GeoLocation FindPointAtDistanceFrom(GeoLocation startPoint, double initialBearingRadians, double distanceKilometres)
         {
             const double radiusEarthKilometres = 6371.01;
-            var distRatio = distanceKilometres / radiusEarthKilometres;
-            var distRatioSine = Math.Sin(distRatio);
-            var distRatioCosine = Math.Cos(distRatio);
+            double distRatio = distanceKilometres / radiusEarthKilometres;
+            double distRatioSine = Math.Sin(distRatio);
+            double distRatioCosine = Math.Cos(distRatio);
 
-            var startLatRad = startPoint.Latitude;
-            var startLonRad = startPoint.Longitude;
+            double startLatCos = Math.Cos(startPoint.Latitude);
+            double startLatSin = Math.Sin(startPoint.Latitude);
 
-            var startLatCos = Math.Cos(startLatRad);
-            var startLatSin = Math.Sin(startLatRad);
+            double endLatRads = Math.Asin((startLatSin * distRatioCosine) + (startLatCos * distRatioSine * Math.Cos(initialBearingRadians)));
 
-            var endLatRads = Math.Asin((startLatSin * distRatioCosine) + (startLatCos * distRatioSine * Math.Cos(initialBearingRadians)));
-
-            var endLonRads = startLonRad
+            double endLonRads = startPoint.Longitude
                 + Math.Atan2(
                     Math.Sin(initialBearingRadians) * distRatioSine * startLatCos,
                     distRatioCosine - startLatSin * Math.Sin(endLatRads));
@@ -74,25 +71,46 @@ namespace MSFS_Kinetic_Assistant
             return speed;
         }
 
-        public double getCableTension(double cableLength, double elasticExtension,winchDirection _winchDirection, double lastFrameTiming, double tensionLimit)
+        public double getCableTension(double cableLength, double elasticExtension, winchDirection _winchDirection)
         {
             double cableTension = 0;
             double dumpingLength = Math.Max(5.0, cableLength * elasticExtension / 100);
+
+            // CALCULATION TENSION MODIFIER
             if (cableLength < _winchDirection.distance)
             {
-                if (cableLength + dumpingLength < _winchDirection.distance) // CABLE FAILURE
-                {
-                    Console.WriteLine($"String failure: {cableLength + dumpingLength:F2} / {_winchDirection.distance:F2}" );
-                    cableTension = 1.1 * tensionLimit;
-                }
-                else
-                {
-                    double diff = _winchDirection.distance - cableLength;
-                    cableTension = Math.Pow(0.75 + diff / dumpingLength, 8);
-                }
+                cableTension = (_winchDirection.distance - cableLength) / dumpingLength;
             }
 
             return cableTension;
+        }
+
+        public double getBodyVelocity(winchDirection _winchDirection, PlaneInfoCommit _planeCommit, double cableTension, double accelerationLimit, double cableLength, double cableLengthPrev, double cableLengthPrePrev, double lastFrameTiming)
+        {
+            double baseAcceleration = 5 * 9.81;
+
+            if (Math.Abs(cableLength - cableLengthPrev) > 10) { cableLengthPrev = cableLength; }
+            if (Math.Abs(cableLengthPrev - cableLengthPrePrev) > 10) { cableLengthPrePrev = cableLengthPrev; }
+            double lengthDiff = (cableLength - cableLengthPrev) * 0.5 + (cableLengthPrev - cableLengthPrePrev) * 0.5;
+            double cableSpeed = lengthDiff / lastFrameTiming * cableTension;
+            if (cableTension > 1 && lengthDiff > 0)
+                cableSpeed += baseAcceleration * Math.Pow(cableTension - 1, 2);
+
+            if (cableSpeed < 2 * accelerationLimit && cableSpeed > accelerationLimit)
+            {
+                cableSpeed = Math.Min(cableSpeed, 0.99 * accelerationLimit);
+            }
+
+            Vector3 planeMotion = new Vector3((float)(_planeCommit.VelocityBodyX * Math.Cos(_winchDirection.heading) * Math.Cos(_winchDirection.pitch)),
+                (float)(_planeCommit.VelocityBodyY * Math.Sin(_winchDirection.heading)),
+                (float)(_planeCommit.VelocityBodyZ * Math.Cos(_winchDirection.heading) * Math.Sin(_winchDirection.pitch)));
+
+            double appliedVelocity = cableSpeed - planeMotion.Norm;
+
+            Console.WriteLine($"getBodyVelocity: {cableTension:F4} {appliedVelocity:F4}m/s  lengthDiff{lengthDiff:F4}m cableSpeed{cableSpeed:F4}");
+            //Console.WriteLine($"cabC: {cableLength:F4}m cabP{cableLengthPrev:F4}m  cabPP{cableLengthPrePrev:F4}m");
+
+            return appliedVelocity > 0 ? appliedVelocity : 0;
         }
     }
 

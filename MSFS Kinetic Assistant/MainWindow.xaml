@@ -42,6 +42,11 @@
                 <scm:SortDescription />
             </CollectionViewSource.SortDescriptions>
         </CollectionViewSource>
+        <CollectionViewSource x:Key="AlphaSortedSimvarNamesTowConnect" Source="{Binding aSimvarNames}">
+            <CollectionViewSource.SortDescriptions>
+                <scm:SortDescription />
+            </CollectionViewSource.SortDescriptions>
+        </CollectionViewSource>
     </Window.Resources>
     <StackPanel x:Name="window" VerticalAlignment="Top">
         <StackPanel>
@@ -80,10 +85,10 @@
                             </TextBlock>
                             <ComboBox  IsEditable="True" TextBoxBase.TextChanged="saveSettings" Name="targetSpeed" Height="26" Margin="0 5 0 0">
                                 <ComboBoxItem>40</ComboBoxItem>
-                                <ComboBoxItem>45</ComboBoxItem>
-                                <ComboBoxItem IsSelected="True">50</ComboBoxItem>
-                                <ComboBoxItem>55</ComboBoxItem>
-                                <ComboBoxItem>60</ComboBoxItem>
+                                <ComboBoxItem>50</ComboBoxItem>
+                                <ComboBoxItem IsSelected="True">60</ComboBoxItem>
+                                <ComboBoxItem>70</ComboBoxItem>
+                                <ComboBoxItem>80</ComboBoxItem>
                             </ComboBox>
                         </StackPanel>
 
@@ -110,11 +115,11 @@
                             </ComboBox>
                         </StackPanel>
 
-                        <StackPanel Margin="5, 10, 5, 0"  >
-                            <Button Height="26px" x:Name="launchPrepareButton" Background="White" IsEnabled="false" Foreground="DarkRed" BorderBrush="DarkRed" Click="toggleLaunchPrepare" Margin="0, 0, 0, 0"  VerticalAlignment="Top">Attach winch cable</Button>
-                            <ComboBox ItemsSource="{Binding Source={StaticResource AlphaSortedSimvarNamesWinch}}" SelectedItem="0" Visibility="Collapsed" Name="toggleLaunchPrepareControl" Tag="toggleLaunchPrepare" SelectionChanged="saveSettings" Height="26" HorizontalAlignment="Stretch">
+                        <StackPanel Margin="5, 10, 5, 0">
+                            <Button Height="52px" x:Name="launchPrepareButton" Background="White" IsEnabled="false" Foreground="DarkRed" BorderBrush="DarkRed" Click="toggleLaunchPrepare" Margin="0, 0, 0, 0"  VerticalAlignment="Top">Attach winch cable</Button>
+                            <ComboBox ItemsSource="{Binding Source={StaticResource AlphaSortedSimvarNamesWinch}}" SelectedItem="0" Visibility="Collapsed" Name="toggleLaunchPrepareControl" Tag="toggleLaunchPrepare" SelectionChanged="saveSettings" Height="26" Margin="0 13 0 13" HorizontalAlignment="Stretch">
                             </ComboBox>
-                            <Button BorderThickness="0" Click="toggleControlOptions" Margin="0 -26 2 0" Cursor="Hand" Width="26px" Height="18px" HorizontalAlignment="Right">
+                            <Button BorderThickness="0" Click="toggleControlOptions" Margin="0 -82 2 0" Cursor="Hand" Background="Transparent" Width="26px" Height="18px" HorizontalAlignment="Right">
                                 <Button.Content>
                                     <Image Source="ctrl1.png" Stretch="Uniform"/>
                                 </Button.Content>
@@ -127,16 +132,47 @@
                         <StackPanel.Background>
                             <ImageBrush ImageSource="tow.bmp"/>
                         </StackPanel.Background>
-                        <StackPanel Margin="5, 5, 5, 0" >
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="98" />
+                                <ColumnDefinition Width="98" />
+                            </Grid.ColumnDefinitions>
+                            
+                            <StackPanel Margin="5, 5, 5, 0" Grid.Column="0" >
+                                <TextBlock FontSize="10">
+                                    Scan range (meters)
+                                </TextBlock>
+                                <ComboBox IsEditable="True" TextBoxBase.TextChanged="saveSettings" Name="towSearchRadius" Height="26" Margin="0 5 0 0">
+                                    <ComboBoxItem>100</ComboBoxItem>
+                                    <ComboBoxItem>200</ComboBoxItem>
+                                    <ComboBoxItem>300</ComboBoxItem>
+                                    <ComboBoxItem IsSelected="True">500</ComboBoxItem>
+                                    <ComboBoxItem>1000</ComboBoxItem>
+                                    <ComboBoxItem>2000</ComboBoxItem>
+                                </ComboBox>
+                            </StackPanel>
+
+                            <StackPanel Margin="0, 5, 5, 0"  Grid.Column="1" >
+                                <TextBlock FontSize="10">
+                                    Elasticity (% of len.)
+                                </TextBlock>
+                                <ComboBox  IsEditable="True" TextBoxBase.TextChanged="saveSettings" Name="towElasticExtension" Height="26" Margin="0 5 0 0">
+                                    <ComboBoxItem>5</ComboBoxItem>
+                                    <ComboBoxItem>10</ComboBoxItem>
+                                    <ComboBoxItem IsSelected="True">15</ComboBoxItem>
+                                    <ComboBoxItem>20</ComboBoxItem>
+                                    <ComboBoxItem>25</ComboBoxItem>
+                                </ComboBox>
+                            </StackPanel>
+                        </Grid>
+
+                        <StackPanel Margin="5, 10, 5, 0"  >
                             <TextBlock FontSize="10">
-                            Max String Length (meters)
+                            Connection Point
                             </TextBlock>
-                            <ComboBox IsEditable="True" TextBoxBase.TextChanged="saveSettings" Name="towStringLength" Height="26" Margin="0 5 0 0">
-                                <ComboBoxItem>50</ComboBoxItem>
-                                <ComboBoxItem>100</ComboBoxItem>
-                                <ComboBoxItem IsSelected="True">150</ComboBoxItem>
-                                <ComboBoxItem>200</ComboBoxItem>
-                                <ComboBoxItem>300</ComboBoxItem>
+                            <ComboBox SelectionChanged="saveSettings" Background="Transparent" Name="towConnectionPoint" Height="26" Margin="0 5 0 0">
+                                <ComboBoxItem>CG hook</ComboBoxItem>
+                                <ComboBoxItem IsSelected="True">Nose hook</ComboBoxItem>
                             </ComboBox>
                         </StackPanel>
 
@@ -155,38 +191,63 @@
 
                         <StackPanel Margin="5, 10, 5, 0"  >
                             <TextBlock FontSize="10">
-                            Elastic Stretch (% of Length)
+                            AI Tow Plane Type
                             </TextBlock>
-                            <ComboBox  IsEditable="True" TextBoxBase.TextChanged="saveSettings" Name="towElasticExtension" Height="26" Margin="0 5 0 0">
-                                <ComboBoxItem>5</ComboBoxItem>
-                                <ComboBoxItem>10</ComboBoxItem>
-                                <ComboBoxItem IsSelected="True">15</ComboBoxItem>
-                                <ComboBoxItem>20</ComboBoxItem>
-                                <ComboBoxItem>25</ComboBoxItem>
+                            <ComboBox Name="towPlaneType" SelectionChanged="saveSettings"  Background="Transparent" Height="26" Margin="0 5 0 0">
+                                <ComboBoxItem IsSelected="true">Icon A5 Asobo</ComboBoxItem>
+                                <ComboBoxItem>FlightDesignCT Asobo</ComboBoxItem>
+                                <ComboBoxItem>Bonanza G36 Asobo</ComboBoxItem>
+                                <ComboBoxItem>DA62 Asobo</ComboBoxItem>
+                                <ComboBoxItem>Beechcraft King Air 350i Asobo</ComboBoxItem>
+                                <ComboBoxItem>TBM 930 Asobo</ComboBoxItem>
+                                <ComboBoxItem>Cessna CJ4 Citation Asobo</ComboBoxItem>
+                                <ComboBoxItem>--- REALISTIC MODE ONLY ---</ComboBoxItem>
+                                <ComboBoxItem>Cessna 208B Grand Caravan EX</ComboBoxItem>
+                                <ComboBoxItem>Cessna 152 Asobo</ComboBoxItem>
+                                <ComboBoxItem>Cessna Skyhawk G1000 Asobo</ComboBoxItem>
+                                <ComboBoxItem>Mudry Cap 10 c</ComboBoxItem>
+                                <ComboBoxItem>DA40-NG Asobo</ComboBoxItem>
+                                <ComboBoxItem>DR400 Asobo</ComboBoxItem>
+                                <ComboBoxItem>Extra 330 Asobo</ComboBoxItem>
+                                <ComboBoxItem>Pitts Asobo</ComboBoxItem>
+                                <ComboBoxItem>Asobo Savage Cub</ComboBoxItem>
                             </ComboBox>
                         </StackPanel>
 
-                        <StackPanel Margin="5, 10, 5, 0"  >
-                            <TextBlock FontSize="10">
-                            Connection Point
-                            </TextBlock>
-                            <ComboBox SelectionChanged="saveSettings" Background="Transparent" Name="towConnectionPoint" Height="26" Margin="0 5 0 0">
-                                <ComboBoxItem>CG hook</ComboBoxItem>
-                                <ComboBoxItem IsSelected="True">Nose hook</ComboBoxItem>
-                            </ComboBox>
-                        </StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="140" />
+                                <ColumnDefinition />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Margin="5, 10, 5, 0" Grid.Column="0" >
+                                <Button IsEnabled="false" Height="26px" x:Name="towToggleButton" Background="White" Click="toggleScanning" Foreground="DarkRed" BorderBrush="DarkRed" Margin="0, 0, 0, 0"  VerticalAlignment="Top">SEARCH</Button>
+                                <ComboBox ItemsSource="{Binding Source={StaticResource AlphaSortedSimvarNamesTowing}}" SelectedItem="0" Visibility="Collapsed" Name="toggleTowControls" Tag="towToggleButton" SelectionChanged="saveSettings" Height="26" HorizontalAlignment="Stretch">
+                                </ComboBox>
+
+                                <Button BorderThickness="0" Click="toggleControlOptions" Margin="0 -26 2 0" Cursor="Hand" Background="Transparent" Width="26px" Height="18px" HorizontalAlignment="Right">
+                                    <Button.Content>
+                                        <Image Source="ctrl1.png" Stretch="Uniform"/>
+                                    </Button.Content>
+                                </Button>
+                            </StackPanel>
+
+                            <StackPanel Margin="0, 10, 5, 0" Grid.Column="1">
+                                <Button ToolTip="EXPERIMENTAL! Use only in small airport which set as departure in flight plan" IsEnabled="false" Height="26px" x:Name="towInsertButton" Background="White" Click="aiTowPlane" Foreground="DarkRed" BorderBrush="DarkRed" Margin="0, 0, 0, 0"  VerticalAlignment="Top">AI TOW</Button>
+                            </StackPanel>
+                        </Grid>
 
                         <StackPanel Margin="5, 10, 5, 0"  >
-                            <Button IsEnabled="false" Height="26px" x:Name="towToggleButton" Background="White" Click="toggleScanning" Foreground="DarkRed" BorderBrush="DarkRed" Margin="0, 0, 0, 0"  VerticalAlignment="Top">Activate Aerotow</Button>
-                            <ComboBox ItemsSource="{Binding Source={StaticResource AlphaSortedSimvarNamesTowing}}" SelectedItem="0" Visibility="Collapsed" Name="toggleTowControls" Tag="toggleThermals" SelectionChanged="saveSettings" Height="26" HorizontalAlignment="Stretch">
+                            <Button IsEnabled="false" Height="52px" x:Name="towConnectButton" Background="White" Click="toggleTowClosest" Foreground="DarkRed" BorderBrush="DarkRed" Margin="0, 0, 0, 0"  VerticalAlignment="Top">Attach To Closest</Button>
+                            <ComboBox ItemsSource="{Binding Source={StaticResource AlphaSortedSimvarNamesTowConnect}}" SelectedItem="0" Visibility="Collapsed" Name="connectTowControls" Tag="toggleTowClosest" SelectionChanged="saveSettings" Height="26" Margin="0 13 0 13" HorizontalAlignment="Stretch">
                             </ComboBox>
 
-                            <Button BorderThickness="0" Click="toggleControlOptions" Margin="0 -26 2 0" Cursor="Hand" Width="26px" Height="18px" HorizontalAlignment="Right">
+                            <Button BorderThickness="0" Click="toggleControlOptions" Margin="0 -82 2 0" Cursor="Hand" Background="Transparent" Width="26px" Height="18px" HorizontalAlignment="Right">
                                 <Button.Content>
                                     <Image Source="ctrl1.png" Stretch="Uniform"/>
                                 </Button.Content>
                             </Button>
                         </StackPanel>
+
                     </StackPanel>
                 </TabItem>
                 <TabItem Header="Catapult"  Height="53" Background="Transparent">
@@ -209,10 +270,10 @@
                         </StackPanel>
 
                         <StackPanel Margin="5, 10, 5, 0" VerticalAlignment="Bottom" >
-                            <Button Height="26px" IsEnabled="false" x:Name="catapultlaunchButton" Background="White" Foreground="DarkRed" BorderBrush="DarkRed" Click="toggleLaunchpadPrepare" Margin="0, 0, 0, 0"  VerticalAlignment="Top">Ready to launch</Button>
-                            <ComboBox ItemsSource="{Binding Source={StaticResource AlphaSortedSimvarNamesCatapult}}" SelectedItem="0" Visibility="Collapsed" Name="toggleLaunchpadPrepareControl" Tag="toggleLaunchpadPrepare" SelectionChanged="saveSettings" Height="26" HorizontalAlignment="Stretch">
+                            <Button Height="52px" IsEnabled="false" x:Name="catapultlaunchButton" Background="White" Foreground="DarkRed" BorderBrush="DarkRed" Click="toggleLaunchpadPrepare" Margin="0, 0, 0, 0"  VerticalAlignment="Top">Ready to launch</Button>
+                            <ComboBox ItemsSource="{Binding Source={StaticResource AlphaSortedSimvarNamesCatapult}}" SelectedItem="0" Visibility="Collapsed" Name="toggleLaunchpadPrepareControl" Tag="toggleLaunchpadPrepare" SelectionChanged="saveSettings" Height="26" Margin="0 13 0 13" HorizontalAlignment="Stretch">
                             </ComboBox>
-                            <Button BorderThickness="0" Click="toggleControlOptions" Margin="0 -26 2 0" Cursor="Hand" Width="26px" Height="18px" HorizontalAlignment="Right">
+                            <Button BorderThickness="0" Click="toggleControlOptions" Margin="0 -82 2 0" Cursor="Hand" Background="Transparent" Width="26px" Height="18px" HorizontalAlignment="Right">
                                 <Button.Content>
                                     <Image Source="ctrl1.png" Stretch="Uniform"/>
                                 </Button.Content>
@@ -237,10 +298,10 @@
                             </ComboBox>
                         </StackPanel>
                         <StackPanel Margin="5, 10, 5, 0"  >
-                            <Button Height="26px" x:Name="hookPrepareButton" IsEnabled="False" Background="White" Click="toggleLandingPrepare" Foreground="DarkRed" BorderBrush="DarkRed" Margin="0, 0, 0, 0"  VerticalAlignment="Top">Extract tailhook</Button>
-                            <ComboBox ItemsSource="{Binding Source={StaticResource AlphaSortedSimvarNamesArrestor}}" SelectedItem="0" Visibility="Collapsed" Name="toggleLandingPrepareControls" Tag="toggleLandingPrepare" SelectionChanged="saveSettings" Height="26" HorizontalAlignment="Stretch">
+                            <Button Height="52px" x:Name="hookPrepareButton" IsEnabled="False" Background="White" Click="toggleLandingPrepare" Foreground="DarkRed" BorderBrush="DarkRed" Margin="0, 0, 0, 0"  VerticalAlignment="Top">Extract tailhook</Button>
+                            <ComboBox ItemsSource="{Binding Source={StaticResource AlphaSortedSimvarNamesArrestor}}" SelectedItem="0" Visibility="Collapsed" Name="toggleLandingPrepareControls" Tag="toggleLandingPrepare" SelectionChanged="saveSettings" Height="26" Margin="0 13 0 13" HorizontalAlignment="Stretch">
                             </ComboBox>
-                            <Button BorderThickness="0" Click="toggleControlOptions" Margin="0 -26 2 0" Cursor="Hand" Width="26px" Height="18px" HorizontalAlignment="Right">
+                            <Button BorderThickness="0" Click="toggleControlOptions" Margin="0 -82 2 0" Cursor="Hand" Background="Transparent" Width="26px" Height="18px" HorizontalAlignment="Right">
                                 <Button.Content>
                                     <Image Source="ctrl1.png" Stretch="Uniform"/>
                                 </Button.Content>
@@ -260,11 +321,11 @@
                             </TextBlock>
                         </StackPanel>
                         <StackPanel Margin="5, 10, 5, 0">
-                            <Button Height="26px" x:Name="thermalsToggleButton" IsEnabled="False" Background="White" Click="toggleThermals" Foreground="DarkRed" BorderBrush="DarkRed" Margin="0, 0, 0, 0"  VerticalAlignment="Top">Enable thermals</Button>
-                            <ComboBox ItemsSource="{Binding Source={StaticResource AlphaSortedSimvarNamesThermals}}" SelectedItem="0" Visibility="Collapsed" Name="toggleThermalsControls" Tag="toggleThermals" SelectionChanged="saveSettings" Height="26" HorizontalAlignment="Stretch">
+                            <Button Height="52px" x:Name="thermalsToggleButton" IsEnabled="False" Background="White" Click="toggleThermals" Foreground="DarkRed" BorderBrush="DarkRed" Margin="0, 0, 0, 0"  VerticalAlignment="Top">Enable thermals</Button>
+                            <ComboBox ItemsSource="{Binding Source={StaticResource AlphaSortedSimvarNamesThermals}}" SelectedItem="0" Visibility="Collapsed" Name="toggleThermalsControls" Tag="toggleThermals" SelectionChanged="saveSettings" Height="26" Margin="0 13 0 13" HorizontalAlignment="Stretch">
                             </ComboBox>
 
-                            <Button BorderThickness="0" Click="toggleControlOptions" Margin="0 -26 2 0" Cursor="Hand" Width="26px" Height="18px" HorizontalAlignment="Right">
+                            <Button BorderThickness="0" Click="toggleControlOptions" Margin="0 -82 2 0" Cursor="Hand" Background="Transparent" Width="26px" Height="18px" HorizontalAlignment="Right">
                                 <Button.Content>
                                     <Image Source="ctrl1.png" Stretch="Uniform"/>
                                 </Button.Content>
@@ -284,10 +345,16 @@
                             <CheckBox x:Name="alwaysOnTop"  Click="saveSettings" IsChecked="False">Always on top</CheckBox>
                         </StackPanel>
                         <StackPanel Margin="5, 10, 5, 0"  >
-                            <CheckBox x:Name="displayTips" Click="saveSettings" IsChecked="True">Display tips</CheckBox>
+                            <CheckBox x:Name="displayTips" Click="saveSettings" IsChecked="True">Display ingame tips</CheckBox>
                         </StackPanel>
                         <StackPanel Margin="5, 10, 5, 0"  >
-                            <CheckBox x:Name="enableFailure" Click="saveSettings" IsChecked="False">Failure</CheckBox>
+                            <CheckBox x:Name="realisticFailures" ToolTip="Disable overload damage in MSFS settings before uncheck!" Click="saveSettings" IsChecked="True">Realistic Failures</CheckBox>
+                        </StackPanel>
+                        <StackPanel Margin="5, 10, 5, 0"  >
+                            <CheckBox x:Name="realisticRestrictions" ToolTip="Do you want to use winch/tow in the air?"  Click="saveSettings" IsChecked="False">Realistic Restrictions</CheckBox>
+                        </StackPanel>
+                        <StackPanel Margin="5, 10, 5, 0"  >
+                            <CheckBox x:Name="realisticTowProcedures" ToolTip="Only for airfields with taxi paths!"  Click="saveSettings" IsChecked="False">Realistic Tow Plane procedures</CheckBox>
                         </StackPanel>
                         <StackPanel Margin="5, 10, 5, 0"  >
                             <CheckBox x:Name="playSounds" Click="saveSettings">Play sounds</CheckBox>
@@ -296,11 +363,31 @@
                             <Slider x:Name="soundsVolume" ValueChanged="saveSettings"  Minimum="0" Maximum="100" Value="50" AutoToolTipPlacement="BottomRight" AutoToolTipPrecision="0"  ></Slider>
                         </StackPanel>
 
-                        <TextBlock VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="10, 170, 10, 0">
+                        <TextBlock TextWrapping="Wrap" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="5, 40, 5, 0">
+                            News, updates and reviews at:
+                        </TextBlock>
+                        <TextBlock TextWrapping="Wrap" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="5, 0, 5, 0">
+                            <Hyperlink NavigateUri="https://www.facebook.com/touching.cloud2020" RequestNavigate="Hyperlink_RequestNavigate">
+                                facebook.com/touching.cloud2020
+                            </Hyperlink>
+                        </TextBlock>
+                        <TextBlock TextWrapping="Wrap" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="5, 0, 5, 0">
                             <Hyperlink NavigateUri="https://msfs.touching.cloud/mods/cloud-assistant/" RequestNavigate="Hyperlink_RequestNavigate">
                                 msfs.touching.cloud
                             </Hyperlink>
                         </TextBlock>
+                        <TextBlock TextWrapping="Wrap" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="5, 0, 5, 0">
+                            <Hyperlink NavigateUri="https://secure.simmarket.com/touching-cloud-msfs-cloud-assistant.phtml" RequestNavigate="Hyperlink_RequestNavigate">
+                                SimMarket add-on page
+                            </Hyperlink>
+                        </TextBlock>
+
+                        
+
+                        <TextBlock TextWrapping="Wrap" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="5, 10, 5, 0">
+                            Support: msfs@touching.cloud
+                        </TextBlock>
+
                     </StackPanel>
                 </TabItem>
             </TabControl>

@@ -37,4 +37,66 @@ namespace MSFS_Kinetic_Assistant
 
         // SHORTCUTS
     };
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
+    public struct PlaneInfoRotate
+    {
+        public double RotationVelocityBodyX;
+        public double RotationVelocityBodyY;
+        public double RotationVelocityBodyZ;
+    };
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
+    public struct NearbyInfoResponse
+    {
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
+        public String Title;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
+        public String Category;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 8)]
+        public String FlightNumber;
+
+        public double Latitude;
+        public double Longitude;
+        public double Altitude;
+        public double Airspeed;
+        public double Verticalspeed;
+        public double Heading;
+        public double Bank;
+        public double SimOnGround;
+        public double OnAnyRunway;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
+    public struct TowInfoResponse
+    {
+        public double Latitude;
+        public double Longitude;
+        public double Altitude;
+        public double Heading;
+        public double Bank;
+        public double VelocityBodyX;
+        public double VelocityBodyY;
+        public double VelocityBodyZ;
+    };
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
+    public struct TowInfoPitch
+    {
+        public double Bank;
+        public double VelocityBodyY;
+    };
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
+    public struct PlaneInfoCommit
+    {
+        public double VelocityBodyX;
+        public double VelocityBodyY;
+        public double VelocityBodyZ;
+        public double AbsoluteTime;
+        public double TailhookPosition;
+        public double LaunchbarPosition;
+        public double WaterRudderHandlePosition;
+    };
+
 }

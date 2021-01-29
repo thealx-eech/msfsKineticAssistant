@@ -125,12 +125,9 @@
       <DependentUpon>App.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="NearbyInfoResponse.cs" />
-    <Compile Include="PlaneInfoRotate.cs" />
     <Compile Include="SimvarsViewModel.cs" />
     <Compile Include="simVars.cs" />
     <Compile Include="MathClass.cs" />
-    <Compile Include="PlaneInfoCommit.cs" />
     <Compile Include="PlaneInfoResponse.cs" />
     <Compile Include="Requests.cs" />
     <Compile Include="MainWindow.xaml.cs">
