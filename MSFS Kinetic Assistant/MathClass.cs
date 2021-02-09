@@ -63,6 +63,18 @@ namespace MSFS_Kinetic_Assistant
 
             return new GeoLocation(endLatRads, endLonRads);
         }
+        public double findDistanceBetweenPoints(double rlat1, double rlon1, double rlat2, double rlon2)
+        {
+            double rtheta = rlon1 - rlon2;
+            double dist = Math.Sin(rlat1) * Math.Sin(rlat2) + Math.Cos(rlat1) *
+                Math.Cos(rlat2) * Math.Cos(rtheta);
+            dist = Math.Acos(dist);
+            dist = dist * 180 / Math.PI;
+            dist = dist * 60 * 1852;
+
+            return dist;
+        }
+
         public double restrictAirspeed(double speed, double _targetSpeed, double lastFrameTiming)
         {
             if (Math.Abs(speed) > _targetSpeed)

@@ -13,7 +13,7 @@ using System.Reflection;
 using Microsoft.Win32;
 using System.Globalization;
 using System.Windows.Media.Imaging;
-using System.Net.Http;
+using System.Net;
 
 //(A:TOW RELEASE HANDLE, percent)/
 //FOLDING WING LEFT PERCENT
@@ -36,8 +36,6 @@ namespace MSFS_Kinetic_Assistant
         // IF NOT NULL - READY TO LAUNCH
         public winchPosition _winchPosition = null;
         public winchPosition _carrierPosition = null;
-        public List<winchPosition> thermalsList = new List<winchPosition>();
-        public List<winchPosition> thermalsListAPI = new List<winchPosition>();
 
         // IF NOT 0 - WINCH WORKING
         public double launchTime = 0;
@@ -54,7 +52,10 @@ namespace MSFS_Kinetic_Assistant
         // IF NOT FALSE - THERMALS CALCULATION IN PROCESS
         public bool thermalsWorking = false;
         public bool thermalsDebugActive = false;
-        public GeoLocation apiThermalsLoaded = null;
+        public GeoLocation apiThermalsLoadedPosition = null;
+        double apiThermalsLoadedTime = 0;
+        public List<winchPosition> thermalsList = new List<winchPosition>();
+        public List<winchPosition> thermalsListAPI = new List<winchPosition>();
 
         // IF NOT 0 - TOWING ACTIVE
         public TowScanMode towScanMode = TowScanMode.Disabled;
@@ -241,7 +242,6 @@ namespace MSFS_Kinetic_Assistant
                 changeButtonStatus(true, hookPrepareButton, true);
                 changeButtonStatus(true, catapultlaunchButton, true);
                 changeButtonStatus(true, thermalsToggleButton, true);
-                changeButtonStatus(true, thermalsKK7Button, true);
                 changeButtonStatus(true, towToggleButton, true);
                 changeButtonStatus(true, towConnectButton, false);
                 changeButtonStatus(true, towInsertButton, true);
@@ -278,7 +278,6 @@ namespace MSFS_Kinetic_Assistant
                 changeButtonStatus(false, hookPrepareButton, false);
                 changeButtonStatus(false, catapultlaunchButton, false);
                 changeButtonStatus(false, thermalsToggleButton, false);
-                changeButtonStatus(false, thermalsKK7Button, false);
                 changeButtonStatus(true, towToggleButton, false);
                 changeButtonStatus(true, towInsertButton, false);
 
@@ -488,7 +487,7 @@ namespace MSFS_Kinetic_Assistant
                     bodyAcceleration = 1.1 * accelerationLimit;
                 }
             }
-            
+
 
             if (type == "Tow" && (towCableLength > towCableDesired || towCableLength < towCableDesired - 1))
             {
@@ -1323,15 +1322,17 @@ namespace MSFS_Kinetic_Assistant
             thermalsMapPath.Text = "No thermals loaded";
         }
 
-        public void toggleKK7Thermals(object sender, RoutedEventArgs e)
+        public void enableKK7Thermals(bool enable)
         {
-            Console.WriteLine("toggleThermals");
 
-            if (apiThermalsLoaded != null)
+            Application.Current.Dispatcher.Invoke(() => changeButtonStatus(!enable, thermalsKK7Button));
+
+            if (!enable)
             {
-                Application.Current.Dispatcher.Invoke(() => changeButtonStatus(true, thermalsKK7Button, true));
+                Console.WriteLine("diableThermals");
                 thermalsListAPI = new List<winchPosition>();
-                apiThermalsLoaded = null;
+                apiThermalsLoadedPosition = null;
+                apiThermalsLoadedTime = 0;
                 Application.Current.Dispatcher.Invoke(() => thermalsMapPath.Text = thermalsList.Count + thermalsListAPI.Count > 0 ? (thermalsList.Count + thermalsListAPI.Count).ToString() + " thermals total" : "No thermals loaded");
 
                 // DISABLE THERMALS
@@ -1340,17 +1341,9 @@ namespace MSFS_Kinetic_Assistant
                     toggleThermals(null, null);
                 }
             }
-            else if (!validConnection())
-            {
-                Console.WriteLine("connection lost");
-            }
-            else if (_planeInfoResponse.Latitude != 0 && _planeInfoResponse.Longitude != 0)
-            {
-                loadKK7Data();
-            }
             else
             {
-                MessageBox.Show("Start flight and press Connect button");
+                Console.WriteLine("enableThermals");
             }
         }
 
@@ -1358,37 +1351,64 @@ namespace MSFS_Kinetic_Assistant
         {
             if (_planeInfoResponse.Latitude != 0 && _planeInfoResponse.Longitude != 0)
             {
-                double[] bounds = getThermalsBounds(new GeoLocation(_planeInfoResponse.Latitude, _planeInfoResponse.Longitude), 0.3);
-                string url = "https://thermal.kk7.ch/api/hotspots/all/" + bounds[0] + "," + bounds[1] + "," + bounds[2] + "," + bounds[3] + "?csv&limit=5000";
-                Console.WriteLine(url);
+                apiThermalsLoadedPosition = new GeoLocation(_planeInfoResponse.Latitude, _planeInfoResponse.Longitude);
+                apiThermalsLoadedTime = _planeInfoResponse.AbsoluteTime;
 
+                // S W N E
+                double[] bounds = getThermalsBounds(new GeoLocation(_planeInfoResponse.Latitude, _planeInfoResponse.Longitude), true);
 
-                HttpClient _httpClient = new HttpClient();
-                var respond = _httpClient.GetStringAsync(url).Result;
-
-                if (respond.Length > 150)
+                if (bounds[0] != 0 && bounds[1] != 0 && bounds[2] != 0 && bounds[3] != 0 && bounds[0] != bounds[2] && bounds[1] != bounds[3])
                 {
-                    Application.Current.Dispatcher.Invoke(() => changeButtonStatus(false, thermalsKK7Button));
-                    insertKK7Thermals(respond);
-                    apiThermalsLoaded = new GeoLocation(_planeInfoResponse.Latitude, _planeInfoResponse.Longitude);
-                    Application.Current.Dispatcher.Invoke(() => thermalsMapPath.Text = thermalsList.Count + thermalsListAPI.Count > 0 ? (thermalsList.Count + thermalsListAPI.Count).ToString() + " thermals total" : "No thermals loaded");
+                    string url = "https://thermal.kk7.ch/api/hotspots/all/" + bounds[0].ToString().Replace(',', '.') + "," + bounds[1].ToString().Replace(',', '.') + "," + bounds[2].ToString().Replace(',', '.') + "," + bounds[3].ToString().Replace(',', '.') + "?csv&limit=5000";
+                    Console.WriteLine(url);
 
-                    Console.WriteLine("Hotspots loaded from thermal.kk7.ch");
+                    try
+                    {
+                        var lWebClient = new WebClient();
+                        string respond = lWebClient.DownloadString(url);
+
+                        if (respond.Length > 150)
+                        {
+                            insertKK7Thermals(respond);
+
+                            showMessage(thermalsListAPI.Count + " hotspots loaded from thermal.kk7.ch", _fsConnect);
+                        }
+                        else
+                        {
+                            showMessage("No hotspots for this area on thermal.kk7.ch", _fsConnect);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("Unable to load thermals from URL" + Environment.NewLine + url + Environment.NewLine + "error: " + ex.Message);
+                    }
                 }
                 else
                 {
-                    MessageBox.Show("Failed to get hotspots data from thermal.kk7.ch");
+                    MessageBox.Show("Failed to request hotspots data");
                 }
             }
+
+            Application.Current.Dispatcher.Invoke(() => thermalsMapPath.Text = thermalsList.Count + thermalsListAPI.Count > 0 ? (thermalsList.Count + thermalsListAPI.Count).ToString() + " thermals total" : "No thermals loaded");
         }
-        
-        // TODO: ACCUARATE GEO CALCULATIONS
-        public double[] getThermalsBounds(GeoLocation coords,  double width, bool degree = true)
+
+        public double[] getThermalsBounds(GeoLocation coords, bool returnDegree)
         {
-            double latDeg = coords.Latitude * (degree ? 180 / Math.PI : 1);
-            double lonDeg = coords.Longitude * (degree ? 180 / Math.PI : 1);
-            double widthFinal = width * (degree ? 1 : Math.PI / 180);
-            return new double[] { latDeg - widthFinal, lonDeg - widthFinal / Math.Cos(coords.Latitude), latDeg + widthFinal, lonDeg + widthFinal / Math.Cos(coords.Latitude) };
+            double lat = coords.Latitude * 180 / Math.PI;
+            double lon = coords.Longitude * 180 / Math.PI;
+            int lonCount = (int)Math.Round(1 / Math.Cos(coords.Latitude)) - 1;
+
+            // S W N E
+            double s = Math.Floor(lat - 0.0000001);
+            double w = Math.Floor(lon - lonCount - 0.0000001);
+            double n = Math.Ceiling(lat + 0.0000001);
+            double e = Math.Ceiling(lon + lonCount + 0.0000001);
+            return new double[] {
+                s * (!returnDegree ? Math.PI / 180 : 1),
+                w * (!returnDegree ? Math.PI / 180 : 1),
+                n * (!returnDegree ? Math.PI / 180 : 1),
+                e * (!returnDegree ? Math.PI / 180 : 1)
+            };
         }
 
         public void thermalsDebug(object sender, RoutedEventArgs e)
@@ -1457,7 +1477,7 @@ namespace MSFS_Kinetic_Assistant
                     if (data.Length >= 4)
                     {
                         double radius = 0.9;
-                        double strength = 6;
+                        double strength = 4;
 
                         if (double.TryParse(data[0], NumberStyles.Any, CultureInfo.InvariantCulture, out double lat) &&
                             double.TryParse(data[1], NumberStyles.Any, CultureInfo.InvariantCulture, out double lng) &&
@@ -1466,7 +1486,34 @@ namespace MSFS_Kinetic_Assistant
                         )
                         {
                             double modifier = probability / 100;
-                            winchPosition _thermalPosition = new winchPosition(new GeoLocation(lat / 180 * Math.PI, lng / 180 * Math.PI), 0, 1852 * radius * modifier, strength / 1.9 * modifier);
+                            lat = lat / 180 * Math.PI;
+                            lng = lng / 180 * Math.PI;
+                            radius *= 1852 * modifier;
+
+                            // CHECK SIBLINGS
+                            if (thermalsListAPI.Count > 0)
+                            {
+                                bool cnt = false;
+
+                                foreach (winchPosition therm in thermalsListAPI)
+                                {
+                                    double distance = Math.Abs(_mathClass.findDistanceBetweenPoints(lat, lng, therm.location.Latitude, therm.location.Longitude));
+
+                                    if ((distance - radius - therm.radius) < 10000 * (modifier * therm.airspeed * 1.9 / strength))
+                                    {
+                                        cnt = true;
+                                        break;
+                                    }
+                                }
+
+                                if (cnt)
+                                {
+                                    continue;
+                                }
+                            }
+
+
+                            winchPosition _thermalPosition = new winchPosition(new GeoLocation(lat, lng), 0, radius, strength / 1.9 * modifier);
                             thermalsListAPI.Add(_thermalPosition);
                         }
                         else
@@ -1489,7 +1536,7 @@ namespace MSFS_Kinetic_Assistant
 
                 foreach(winchPosition thermal in thermalsListAPI)
                 {
-                    csv += "Location,,thermal,"+ (thermal.location.Latitude * 180 / Math.PI) + "," + (thermal.location.Longitude * 180 / Math.PI) + ",5000,1,1,,,250,2020-01-01T00:00:00.000," + Environment.NewLine;
+                    csv += "Location,,thermal,"+ (thermal.location.Latitude * 180 / Math.PI) + "," + (thermal.location.Longitude * 180 / Math.PI) + ",0,1,"+ (thermal.radius/ 1852).ToString("0.0").Replace(',', '.') + " " + (thermal.airspeed * 1.9).ToString("0.0").Replace(',', '.') + ",,,250,2020-01-01T00:00:00.000," + Environment.NewLine;
                 }
 
                 SaveFileDialog sfd = new SaveFileDialog();
@@ -1505,7 +1552,7 @@ namespace MSFS_Kinetic_Assistant
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show("Failed to save CSV file");
+                        MessageBox.Show("Failed to save API data. Error: " + ex.Message);
                     }
                 }
             }
@@ -1525,13 +1572,13 @@ namespace MSFS_Kinetic_Assistant
             {
                 Console.WriteLine("connection lost");
             }
-            else if (thermalsList.Count == 0 && thermalsListAPI.Count == 0)
-            {
-                Application.Current.Dispatcher.Invoke(() => playSound("error"));
-                Application.Current.Dispatcher.Invoke(() => thermalsMapPath.Text = "Load thermals map!");
-            }
             else
             {
+                if (thermalsList.Count == 0 && thermalsListAPI.Count == 0)
+                {
+                    Application.Current.Dispatcher.Invoke(() => thermalsMapPath.Text = "No thermal maps loaded");
+                }
+
                 thermalsWorking = true;
                 showMessage("Thermals enabled", _fsConnect);
                 Application.Current.Dispatcher.Invoke(() => playSound("true"));
@@ -1595,11 +1642,11 @@ namespace MSFS_Kinetic_Assistant
 
                                 if (thermalsDebugActive)
                                 {
-                                    Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Children.Add(makeTextBlock("To center:  " + bar.Substring(0, (int)(horizontalModifier * 100 / 3)), Colors.Black, 12)));
-                                    Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Children.Add(makeTextBlock("To top:     " + bar.Substring(0, (int)(verticalModifier * 100 / 3)), (height - acAltitude) > 0 ? Colors.Black : Colors.DarkRed, 12)));
-                                    Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Children.Add(makeTextBlock("Pitch/bank: " + bar.Substring(0, (int)(pitchBankModifier * 100 / 3)), Colors.Black, 12)));
-                                    Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Children.Add(makeTextBlock("Velocity:   " + bar.Substring(0, (int)(airspeedModifier * 100 / 3)), Colors.Black, 12)));
-                                    Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Children.Add(makeTextBlock("Total lift: " + bar.Substring(0, (int)(finalModifier * 100 / 3)) + Environment.NewLine + Environment.NewLine, finalModifier > 0 ? Colors.Black : Colors.DarkRed, 12)));
+                                    Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Children.Add(makeTextBlock("To center:  " + bar.Substring(0, (int)(horizontalModifier * 100 / 4)), Colors.Black, 12)));
+                                    Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Children.Add(makeTextBlock("To top:     " + bar.Substring(0, (int)(verticalModifier * 100 / 4)), (height - acAltitude) > 0 ? Colors.Black : Colors.DarkRed, 12)));
+                                    Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Children.Add(makeTextBlock("Pitch/bank: " + bar.Substring(0, (int)(pitchBankModifier * 100 / 4)), Colors.Black, 12)));
+                                    Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Children.Add(makeTextBlock("Velocity:   " + bar.Substring(0, (int)(airspeedModifier * 100 / 4)), Colors.Black, 12)));
+                                    Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Children.Add(makeTextBlock("Total lift: " + bar.Substring(0, (int)(finalModifier * 100 / 4)) + Environment.NewLine + Environment.NewLine, finalModifier > 0 ? Colors.Black : Colors.DarkRed, 12)));
                                 }
 
                             }
@@ -1636,14 +1683,23 @@ namespace MSFS_Kinetic_Assistant
 
                     trackControlChanges();
 
-                    // UPDATE THERMALS
-                    if (thermalsWorking && apiThermalsLoaded != null && _planeInfoResponse.Latitude != 0 && _planeInfoResponse.Longitude != 0)
+                    // UPDATE KK7 DATA
+                    if (assistantSettings["hotspotsAutoload"] == 1 && thermalsWorking && _planeInfoResponse.Latitude != 0 &&
+                        _planeInfoResponse.Longitude != 0 && _planeInfoResponse.AbsoluteTime > 20 + apiThermalsLoadedTime)
                     {
-                        double[] bounds = getThermalsBounds(apiThermalsLoaded, 0.28, false);
-                        if (_planeInfoResponse.Latitude < bounds[0] || _planeInfoResponse.Latitude > bounds[2] || _planeInfoResponse.Longitude < bounds[1] || _planeInfoResponse.Longitude > bounds[3])
+                        if (apiThermalsLoadedPosition == null)
                         {
-                            Console.WriteLine($"Plane outside of loaded thermals area: {_planeInfoResponse.Latitude:F5} {_planeInfoResponse.Longitude:F5} - {bounds[0]:F5} {bounds[1]:F5} {bounds[2]:F5} {bounds[3]:F5} ");
                             loadKK7Data();
+                        }
+                        else
+                        {
+                            double[] bounds = getThermalsBounds(apiThermalsLoadedPosition, false);
+                            // S W N E
+                            if (_planeInfoResponse.Latitude < bounds[0] || _planeInfoResponse.Latitude > bounds[2] || _planeInfoResponse.Longitude < bounds[1] || _planeInfoResponse.Longitude > bounds[3])
+                            {
+                                Console.WriteLine($"Plane outside of loaded thermals area: {_planeInfoResponse.Latitude:F5} {_planeInfoResponse.Longitude:F5} - {bounds[0]:F5} {bounds[1]:F5} {bounds[2]:F5} {bounds[3]:F5} ");
+                                loadKK7Data();
+                            }
                         }
                     }
 
@@ -2121,11 +2177,12 @@ namespace MSFS_Kinetic_Assistant
                     JsonConvert.PopulateObject(File.ReadAllText("assistantSettings.json"), assistantSettings);
                     processSettings(true);
 
-                    WindowBackground.Opacity = assistantSettings["transparentBackground"] == 1 ? 0.2 : 1;
-                    mainWindow.Topmost = assistantSettings["alwaysOnTop"] == 1;
+                    WindowBackground.Opacity = assistantSettings.ContainsKey("transparentBackground") && assistantSettings["transparentBackground"] == 1 ? 0.2 : 1;
+                    mainWindow.Topmost = assistantSettings.ContainsKey("alwaysOnTop") && assistantSettings["alwaysOnTop"] == 1;
                     OnTopIcon.Content = getIconImage(alwaysOnTop.IsChecked == true, (OnTopIcon.Tag.ToString()));
                     TransparentIcon.Content = getIconImage(transparentBackground.IsChecked == true, (TransparentIcon.Tag.ToString()));
 
+                    enableKK7Thermals(assistantSettings.ContainsKey("hotspotsAutoload") && assistantSettings["hotspotsAutoload"] == 1);
                 }
                 catch (Exception ex)
                 {
@@ -2155,6 +2212,10 @@ namespace MSFS_Kinetic_Assistant
                         {
                             mainWindow.Topmost = ((CheckBox)sender).IsChecked == true;
                             OnTopIcon.Content = getIconImage(((CheckBox)sender).IsChecked == true, (OnTopIcon.Tag.ToString()));
+                        }
+                        else if (((CheckBox)sender).Name == "hotspotsAutoload")
+                        {
+                            enableKK7Thermals(((CheckBox)sender).IsChecked == true);
                         }
                     }
                 }
@@ -2249,6 +2310,11 @@ namespace MSFS_Kinetic_Assistant
         {
             transparentBackground.IsChecked = !transparentBackground.IsChecked;
             saveSettings(transparentBackground, null);
+        }
+        public void toggleHotspotsAutoload(object sender, RoutedEventArgs e)
+        {
+            hotspotsAutoload.IsChecked = !hotspotsAutoload.IsChecked;
+            saveSettings(hotspotsAutoload, null);
         }
         public void MinimizeIconClick(object sender, EventArgs e)
         {

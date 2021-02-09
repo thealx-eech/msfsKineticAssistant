@@ -380,7 +380,7 @@
                             <Button Height="26px" x:Name="thermalsLoadButton" Background="White" Click="thermalsLoadMap" Margin="0, 0, 0, 0"  VerticalAlignment="Top">LittleNavMap thermals map (CSV)</Button>
 
                             <StackPanel Margin="0, 5, 0, 0" Grid.Column="0" >
-                                <Button Height="26px" x:Name="thermalsKK7Button"  IsEnabled="False" Background="White" Foreground="DarkRed" BorderBrush="DarkRed"  Click="toggleKK7Thermals" VerticalAlignment="Top">THERMAL.KK7.CH</Button>
+                                <Button Height="26px" x:Name="thermalsKK7Button" Background="White" Foreground="DarkGreen" BorderBrush="DarkGreen"  Click="toggleHotspotsAutoload" VerticalAlignment="Top">THERMAL.KK7.CH</Button>
                                 <Button BorderThickness="0" Click="kk7CsvExport" Margin="0 -26 2 0" Cursor="Hand" Background="Transparent" Width="42px" Height="18px" HorizontalAlignment="Left" ToolTip="Export hotspots as LittleNavMap Userpoints CSV">
                                     <Button.Content>
                                         <Image Source="csv.png" Stretch="Uniform"/>
@@ -439,13 +439,16 @@
                         <StackPanel.Background>
                             <ImageBrush ImageSource="settings.bmp" Opacity="0.1"/>
                         </StackPanel.Background>
-                        <StackPanel Margin="5, 5, 5, 0"  >
+                        <StackPanel Margin="5, 5, 5, 0" Visibility="Collapsed" >
                             <CheckBox x:Name="alwaysOnTop"  Click="saveSettings" IsChecked="False">Always on top</CheckBox>
                         </StackPanel>
-                        <StackPanel Margin="5, 10, 5, 0"  >
+                        <StackPanel Margin="5, 10, 5, 0" Visibility="Collapsed" >
                             <CheckBox x:Name="transparentBackground"  Click="saveSettings" IsChecked="False">Transparent background</CheckBox>
                         </StackPanel>
-                        <StackPanel Margin="5, 10, 5, 0"  >
+                        <StackPanel Margin="5, 10, 5, 0" Visibility="Collapsed" >
+                            <CheckBox x:Name="hotspotsAutoload"  Click="saveSettings" IsChecked="False">Hotspots data load</CheckBox>
+                        </StackPanel>
+                        <StackPanel Margin="5, 10, 5, 0">
                             <CheckBox x:Name="autoConnect" IsEnabled="false"  Click="saveSettings" IsChecked="False">Autoconnect</CheckBox>
                         </StackPanel>
                         <StackPanel Margin="5, 10, 5, 0"  >
