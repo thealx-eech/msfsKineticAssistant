@@ -20,6 +20,7 @@ namespace MSFS_Kinetic_Assistant
         public double SimOnGround;
         public double BrakeParkingPosition;
         public double OnAnyRunway;
+        public double IsSlewActive;
 
         public double LIGHTPANEL;
         public double LIGHTSTROBE;
@@ -98,5 +99,19 @@ namespace MSFS_Kinetic_Assistant
         public double LaunchbarPosition;
         public double WaterRudderHandlePosition;
     };
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
+    public struct PlaneEngineData
+    {
+        public double TURBTHRUST1;
+        public double TURBTHRUST2;
+        public double TURBTHRUST3;
+        public double TURBTHRUST4;
+        public double ENGTORQUE1;
+        public double ENGTORQUE2;
+        public double ENGTORQUE3;
+        public double ENGTORQUE4;
+    };
+
 
 }

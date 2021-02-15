@@ -10,6 +10,7 @@
         Airport = 5,
         SystemEvents = 6,
         TowPlaneCommit = 7,
+        PlaneEngineData = 8,
     }
 
     public enum Definitions
@@ -22,5 +23,6 @@
         Airport = 5,
         SystemEvents = 6,
         TowPlaneCommit = 7,
+        PlaneEngineData = 8,
     }
 }
