@@ -11,6 +11,12 @@
         SystemEvents = 6,
         TowPlaneCommit = 7,
         PlaneEngineData = 8,
+        Paused = 9,
+        Unpaused = 10,
+        PositionChanged = 11,
+        SimStart = 12,
+        SimStop = 13,
+        WeatherData = 14,
     }
 
     public enum Definitions
@@ -24,5 +30,11 @@
         SystemEvents = 6,
         TowPlaneCommit = 7,
         PlaneEngineData = 8,
+        Paused = 9,
+        Unpaused = 10,
+        PositionChanged = 11,
+        SimStart = 12,
+        SimStop = 13,
+        WeatherData = 14,
     }
 }

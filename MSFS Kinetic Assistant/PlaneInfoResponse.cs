@@ -21,6 +21,8 @@ namespace MSFS_Kinetic_Assistant
         public double BrakeParkingPosition;
         public double OnAnyRunway;
         public double IsSlewActive;
+        public double GpsGroundSpeed;
+        public double AirspeedIndicated;
 
         public double LIGHTPANEL;
         public double LIGHTSTROBE;
@@ -66,6 +68,7 @@ namespace MSFS_Kinetic_Assistant
         public double Bank;
         public double SimOnGround;
         public double OnAnyRunway;
+        //public double AmbientInCloud;
     }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
@@ -98,6 +101,8 @@ namespace MSFS_Kinetic_Assistant
         public double TailhookPosition;
         public double LaunchbarPosition;
         public double WaterRudderHandlePosition;
+        public double LIGHTLANDING;
+        public double LIGHTTAXI;
     };
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
@@ -113,5 +118,25 @@ namespace MSFS_Kinetic_Assistant
         public double ENGTORQUE4;
     };
 
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
+    public struct WeatherReport
+    {
+        public double AmbientAirTemperature;
+        public double AmbientBarometerPressure;
+        public double AmbientDensity;
+        public double AmbientInCloud;
+        public double AmbientPrecipState;
+        public double AmbientPressure;
+        public double AmbientSeaLevelPressure;
+        public double AmbientStandardAtmTemperature;
+        public double AmbientTemperature;
+        public double AmbientVisibility;
+        public double AmbientWindDirection;
+        public double AmbientWindVelocity;
+        public double LocalDayOfYear;
+        public double LocalTime;
+        public double TimeOfDay;
+    };
 
 }
