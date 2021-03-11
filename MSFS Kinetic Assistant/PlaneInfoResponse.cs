@@ -23,6 +23,8 @@ namespace MSFS_Kinetic_Assistant
         public double IsSlewActive;
         public double GpsGroundSpeed;
         public double AirspeedIndicated;
+        public double VerticalSpeed;
+        public double AmbientWindY;
 
         public double LIGHTPANEL;
         public double LIGHTSTROBE;
@@ -87,8 +89,11 @@ namespace MSFS_Kinetic_Assistant
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
     public struct TowInfoPitch
     {
+        public double Heading;
+        public double Pitch;
         public double Bank;
         public double VelocityBodyY;
+        public double VelocityBodyZ;
     };
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
@@ -100,7 +105,7 @@ namespace MSFS_Kinetic_Assistant
         public double AbsoluteTime;
         public double TailhookPosition;
         public double LaunchbarPosition;
-        public double WaterRudderHandlePosition;
+        //public double WaterRudderHandlePosition;
         public double LIGHTLANDING;
         public double LIGHTTAXI;
     };

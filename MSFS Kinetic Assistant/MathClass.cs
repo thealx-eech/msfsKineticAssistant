@@ -14,7 +14,8 @@ namespace MSFS_Kinetic_Assistant
             return _winchPosition;
         }
 
-        public winchDirection getForceDirection(winchPosition _winchPosition, PlaneInfoResponse _planeInfoResponse) {
+        public winchDirection getForceDirection(winchPosition _winchPosition, PlaneInfoResponse _planeInfoResponse)
+        {
             winchDirection _winchDirection = new winchDirection();
 
             double globalX = (_winchPosition.location.Longitude - _planeInfoResponse.Longitude) * Math.Cos(_winchPosition.location.Latitude) * 6378137;
@@ -23,18 +24,18 @@ namespace MSFS_Kinetic_Assistant
             Vector3 globalToWinch = new Vector3((float)globalX, (float)globalY, (float)globalZ);
             Vector3 globalToWinchNorm = globalToWinch;
             globalToWinchNorm.Normalize();
-            
+
             _winchDirection.climbAngle = Math.Abs(Math.Asin(globalToWinchNorm.Y));
 
             Matrix3x3 attitude = Matrix3x3.CreateFromYawPitchRoll((float)_planeInfoResponse.PlaneHeading, (float)_planeInfoResponse.PlanePitch, (float)_planeInfoResponse.PlaneBank);
             _winchDirection.localForceDirection = Matrix3x3.Multiply(attitude.Inverse(), globalToWinchNorm);
             _winchDirection.localForceDirection.Normalize();
 
-            _winchDirection.heading = Math.Atan2(_winchDirection.localForceDirection.X, _winchDirection.localForceDirection.Z);
+            _winchDirection.heading = -_planeInfoResponse.PlaneHeading + findBearingToPoint(_planeInfoResponse.Latitude, _planeInfoResponse.Longitude, _winchPosition.location.Latitude, _winchPosition.location.Longitude);
             _winchDirection.pitch = Math.Asin(_winchDirection.localForceDirection.Y);
             _winchDirection.distance = (double)(globalToWinch.Norm);
+            _winchDirection.groundDistance = findDistanceBetweenPoints(_planeInfoResponse.Latitude, _planeInfoResponse.Longitude, _winchPosition.location.Latitude, _winchPosition.location.Longitude);
             globalToWinch.Y = 0;
-            _winchDirection.groundDistance = (double)(globalToWinch.Norm);
 
             if (_winchDirection.heading > Math.PI) { _winchDirection.heading -= 2 * Math.PI; }
             if (_winchDirection.heading < -Math.PI) { _winchDirection.heading += 2 * Math.PI; }
@@ -73,6 +74,16 @@ namespace MSFS_Kinetic_Assistant
             dist = dist * 60 * 1852;
 
             return dist;
+        }
+
+        public double findBearingToPoint(double rlat1, double rlon1, double rlat2, double rlon2)
+        {
+            double rtheta = rlon2 - rlon1;
+            double dPhi = Math.Log(
+                Math.Tan(rlat2 / 2 + Math.PI / 4) / Math.Tan(rlat1 / 2 + Math.PI / 4));
+            if (Math.Abs(rtheta) > Math.PI)
+                rtheta = rtheta > 0 ? -(2 * Math.PI - rtheta) : (2 * Math.PI + rtheta);
+            return Math.Atan2(rtheta, dPhi) % Math.PI;
         }
 
         public double restrictAirspeed(double speed, double _targetSpeed, double lastFrameTiming)
@@ -167,5 +178,20 @@ namespace MSFS_Kinetic_Assistant
 
         public double Latitude { get; set; }
         public double Longitude { get; set; }
+    }
+    public class Waypoint
+    {
+        public Waypoint(GeoLocation loc, string name, string entered, string passed)
+        {
+            Location = loc;
+            Name = name;
+            Entered = entered;
+            Passed = passed;
+        }
+
+        public GeoLocation Location { get; set; }
+        public string Name { get; set; }
+        public string Entered { get; set; }
+        public string Passed { get; set; }
     }
 }

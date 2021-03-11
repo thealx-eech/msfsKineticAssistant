@@ -20,68 +20,74 @@ using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading;
 
-//(A:TOW RELEASE HANDLE, percent)/
-//FOLDING WING LEFT PERCENT
-//FOLDING WING RIGHT PERCENT
+//-TOW RELEASE HANDLE
+//=FOLDING WING LEFT PERCENT
+//=FOLDING WING RIGHT PERCENT
+//+WATER RUDDER HANDLE POSITION
+//?CANOPY OPEN
+//+TAILHOOK POSITION
+//?EXIT OPEN:index
+
 
 namespace MSFS_Kinetic_Assistant
 {
     public partial class MainWindow : System.Windows.Window
     {
-        public FsConnect _fsConnect;
-        public PlaneInfoResponse _planeInfoResponse;
-        public PlaneInfoResponse _planeInfoResponseLast;
-        public PlaneInfoCommit _planeCommit;
-        public PlaneInfoCommit _planeCommitLast;
-        public PlaneInfoRotate _planeRotate;
-        public PlaneEngineData _planeEngineData;
-        public Dictionary<uint, winchPosition> _nearbyInfoResponse;
-        public Dictionary<uint, winchPosition> _nearbyInfoResponseLast;
-        public Dictionary<uint, winchPosition> _nearbyInfoResponsePreLast;
-        public WeatherReport _weatherReport;
+        private FsConnect _fsConnect;
+        private PlaneInfoResponse _planeInfoResponse;
+        private PlaneInfoResponse _planeInfoResponseLast;
+        private PlaneInfoCommit _planeCommit;
+        private PlaneInfoCommit _planeCommitLast;
+        private PlaneInfoRotate _planeRotate;
+        private PlaneEngineData _planeEngineData;
+        private Dictionary<uint, winchPosition> _nearbyInfoResponse;
+        private Dictionary<uint, winchPosition> _nearbyInfoResponseLast;
+        private Dictionary<uint, winchPosition> _nearbyInfoResponsePreLast;
+        private WeatherReport _weatherReport;
 
         // IF NOT NULL - READY TO LAUNCH
-        public winchPosition _winchPosition = null;
-        public winchPosition _carrierPosition = null;
+        private winchPosition _winchPosition = null;
+        private winchPosition _carrierPosition = null;
 
         // IF NOT 0 - WINCH WORKING
-        public double launchTime = 0;
-        public double cableLength = 0;
-        public double cableLengthPrev = 0;
-        public double cableLengthPrePrev = 0;
+        private double launchTime = 0;
+        private double cableLength = 0;
+        private double cableLengthPrev = 0;
+        private double cableLengthPrePrev = 0;
 
         // IF NOT 0 - ARRESTER CONNECTED
-        public double arrestorConnectedTime = 0;
+        private double arrestorConnectedTime = 0;
 
         // IF NOT 0 - CATAPULT LAUNCH IN PROCESS
-        public double targedCatapultVelocity = 0;
+        private double targedCatapultVelocity = 0;
 
         // IF NOT FALSE - THERMALS CALCULATION IN PROCESS
-        public bool thermalsWorking = false;
-        public bool thermalsDebugActive = false;
-        public GeoLocation apiThermalsLoadedPosition = null;
+        private bool thermalsWorking = false;
+        private byte thermalsDebugActive = 0;
+        private GeoLocation apiThermalsLoadedPosition = null;
         double apiThermalsLoadedTime = 0;
-        public List<winchPosition> thermalsList = new List<winchPosition>();
-        public List<winchPosition> thermalsListAPI = new List<winchPosition>();
-        public double windDirection;
-        public double windVelocity;
-        public double dayTimeModifier;
-        public double overcastModifier;
+        private List<winchPosition> thermalsList = new List<winchPosition>();
+        private List<winchPosition> thermalsListAPI = new List<winchPosition>();
+        private double windDirection;
+        private double windVelocity;
+        private double dayTimeModifier;
+        private double overcastModifier;
+        private int scaleRefresh = 0;
 
         // IF NOT 0 - TOWING ACTIVE
-        public TowScanMode towScanMode = TowScanMode.Disabled;
-        public double towToggledAltitude;
-        public static uint TARGETMAX = 99999999;
-        public uint towingTarget = TARGETMAX;
-        public double lightToggled = 0;
-        public KeyValuePair<uint, bool> insertedTowPlane = new KeyValuePair<uint, bool>(TARGETMAX, false);
-        public double towCableLength = 0;
-        public double towPrevDist = 0;
-        public double towPrePrevDist = 0;
-        public double towCableDesired = 40;
-        public double insertTowPlanePressed = 0;
-        public double AIholdInterval = 8;
-        public enum TowScanMode
+        private TowScanMode towScanMode = TowScanMode.Disabled;
+        private double towToggledAltitude;
+        private static uint TARGETMAX = 99999999;
+        private uint towingTarget = TARGETMAX;
+        private double lightToggled = 0;
+        private KeyValuePair<uint, bool> insertedTowPlane = new KeyValuePair<uint, bool>(TARGETMAX, false);
+        private double towCableLength = 0;
+        private double towPrevDist = 0;
+        private double towPrePrevDist = 0;
+        private double towCableDesired = 40;
+        private double insertTowPlanePressed = 0;
+        private double AIholdInterval = 8;
+        private enum TowScanMode
         {
             Disabled = 0,
             Scan = 1,
@@ -104,17 +110,19 @@ namespace MSFS_Kinetic_Assistant
         bool launchpadAbortInitiated = false;
         bool arrestorsAbortInitiated = false;
 
-        public double absoluteTime;
-        public double swLast;
-        public double lastFrameTiming;
+        private double absoluteTime;
+        private double swLast;
+        private double lastFrameTiming;
         DispatcherTimer dispatcherTimer;
-        public double lastPreparePressed = 0;
+        DispatcherTimer launchTimer;
+        private double lastPreparePressed = 0;
 
         string optPath;
         string plnPath;
 
-        public bool loaded = false;
+        private bool loaded = false;
         MathClass _mathClass;
+        RadarClass _radarClass;
 
         Dictionary<string, double> assistantSettings;
         Dictionary<string, double> controlTimestamps;
@@ -126,10 +134,19 @@ namespace MSFS_Kinetic_Assistant
         private Server server;
         private Thread threadServer;
 
+        // RADAR
+#if DEBUG
+        double allowedRadarScale = 5;
+#else
+        double allowedRadarScale = 50;
+#endif
+        double maxRadarScale = 50;
+
         public MainWindow()
         {
             DataContext = new SimvarsViewModel();
             _mathClass = new MathClass();
+            _radarClass = new RadarClass();
             assistantSettings = new Dictionary<string, double>();
 
             // PREPARE CONTROLS DATA
@@ -140,8 +157,11 @@ namespace MSFS_Kinetic_Assistant
 
             InitializeComponent();
 
-            this.Title = ((AssemblyTitleAttribute)Attribute.GetCustomAttribute(Assembly.GetExecutingAssembly(), typeof(AssemblyTitleAttribute), false)).Title + " " +
-            Assembly.GetExecutingAssembly().GetName().Version.ToString();
+            this.Title = ((AssemblyTitleAttribute)Attribute.GetCustomAttribute(Assembly.GetExecutingAssembly(), typeof(AssemblyTitleAttribute), false)).Title;
+#if !DEBUG
+            this.Title += "+";
+#endif
+            this.Title += " " + Assembly.GetExecutingAssembly().GetName().Version.ToString();
             AppName.Text = this.Title;
 
             // COMMUNITY CHECK
@@ -151,16 +171,36 @@ namespace MSFS_Kinetic_Assistant
                 Application.Current.Shutdown();
             }
 
+            optPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) + @"\Packages\Microsoft.FlightSimulator_8wekyb3d8bbwe\LocalState\";
+            if (!Directory.Exists(optPath))
+                optPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\Microsoft Flight Simulator\";
+            if (!Directory.Exists(optPath))
+                optPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) + @"\PackagesMicrosoft.FlightDashboard_8wekyb3d8bbwe\LocalState\";
+
+            addLogMessage("MSFS Path: " + optPath);
+
+            addServerIPs();
+
+            loadSettings();
+            loaded = true;
+
+            _ = CheckUpdateAsync();
+
+            if (assistantSettings.ContainsKey("nmeaServer") && assistantSettings["nmeaServer"] != 0)
+            {
+                ServerStart(((ComboBoxItem)nmeaServer.SelectedItem).Tag.ToString());
+            }
+
             // COMMON SIM VALUES REQUEST TIMER
             dispatcherTimer = new DispatcherTimer();
             dispatcherTimer.Interval = new TimeSpan(0, 0, 0, 0, 250);
             dispatcherTimer.Tick += new EventHandler(commonInterval);
             dispatcherTimer.Start();
 
-            dispatcherTimer = new DispatcherTimer();
-            dispatcherTimer.Interval = new TimeSpan(0, 0, 0, 0, 50);
-            dispatcherTimer.Tick += new EventHandler(launchInterval);
-            dispatcherTimer.Start();
+            launchTimer = new DispatcherTimer();
+            launchTimer.Interval = new TimeSpan(0, 0, 0, 0, 1000 / Math.Max(5, (int)(assistantSettings.ContainsKey("RequestsFrequency") ? assistantSettings["RequestsFrequency"] : 5)));
+            launchTimer.Tick += new EventHandler(launchInterval);
+            launchTimer.Start();
 
             dispatcherTimer = new DispatcherTimer();
             dispatcherTimer.Interval = new TimeSpan(0, 0, 0, 1);
@@ -176,48 +216,30 @@ namespace MSFS_Kinetic_Assistant
             dispatcherTimer.Interval = new TimeSpan(1, 0, 0);
             dispatcherTimer.Tick += new EventHandler(triggerCheckUpdate);
             dispatcherTimer.Start();
-
-            optPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) + @"\Packages\Microsoft.FlightSimulator_8wekyb3d8bbwe\LocalState\";
-            if (!Directory.Exists(optPath))
-                optPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\Microsoft Flight Simulator\";
-            if (!Directory.Exists(optPath))
-                optPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) + @"\PackagesMicrosoft.FlightDashboard_8wekyb3d8bbwe\LocalState\";
-
-            Console.WriteLine("MSFS Path: " + optPath);
-
-            loadSettings();
-            loaded = true;
-
-            _ = CheckUpdateAsync();
-
-            if (assistantSettings.ContainsKey("nmeaServer") && assistantSettings["nmeaServer"] == 1)
-            {
-                ServerStart();
-            }
         }
 
         private void Window_PreviewLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
         {
             Application.Current.MainWindow.Topmost = assistantSettings["alwaysOnTop"] == 1;
         }
-        public void commonInterval(object sender, EventArgs e)
+        private void commonInterval(object sender, EventArgs e)
         {
-            if (_fsConnect != null)
+            if (validConnection())
             {
                 if (_winchPosition == null && _carrierPosition == null && targedCatapultVelocity == 0 && !thermalsWorking && towingTarget == TARGETMAX && !taskInProcess)
                     _fsConnect.RequestData(Requests.PlaneInfo, Definitions.PlaneInfo);
 
                 if (towScanMode > TowScanMode.Disabled && towingTarget == TARGETMAX)
-                    _fsConnect.RequestData(Requests.NearbyObjects, Definitions.NearbyObjects, (uint)(assistantSettings["towSearchRadius"]), getTowObjectType());
+                    _fsConnect.RequestData(Requests.NearbyObjects, Definitions.NearbyObjects, (uint)(1000 * Math.Min(allowedRadarScale, (assistantSettings.ContainsKey("RadarScale") ? assistantSettings["RadarScale"] : allowedRadarScale))), getTowObjectType());
 
                 if (taskInProcess)
                     _fsConnect.RequestData(Requests.PlaneEngineData, Definitions.PlaneEngineData);
             }
         }
 
-        public void launchInterval(object sender, EventArgs e)
+        private void launchInterval(object sender, EventArgs e)
         {
-            if (_fsConnect != null)
+            if (validConnection())
             {
                 if (_winchPosition != null || _carrierPosition != null || targedCatapultVelocity != 0 || thermalsWorking || towingTarget != TARGETMAX || taskInProcess)
                 {
@@ -227,22 +249,19 @@ namespace MSFS_Kinetic_Assistant
                 }
 
                 if (towScanMode > TowScanMode.Disabled && towingTarget != TARGETMAX)
-                    _fsConnect.RequestData(Requests.NearbyObjects, Definitions.NearbyObjects, (uint)(assistantSettings["towSearchRadius"]), getTowObjectType());
+                    _fsConnect.RequestData(Requests.NearbyObjects, Definitions.NearbyObjects, (uint)(1000 * Math.Min(allowedRadarScale, assistantSettings["RadarScale"])), getTowObjectType());
             }
         }
 
-        public void weatherInterval(object sender, EventArgs e)
+        private void weatherInterval(object sender, EventArgs e)
         {
-            if (_fsConnect != null)
+            if (validConnection())
             {
-                if (thermalsWorking)
-                {
-                    _fsConnect.RequestData(Requests.WeatherData, Definitions.WeatherData);
-                }
+                _fsConnect.RequestData(Requests.WeatherData, Definitions.WeatherData);
             }
         }
 
-        public SIMCONNECT_SIMOBJECT_TYPE getTowObjectType()
+        private SIMCONNECT_SIMOBJECT_TYPE getTowObjectType()
         {
             switch ((int)assistantSettings["towScanType"])
             {
@@ -260,12 +279,14 @@ namespace MSFS_Kinetic_Assistant
 
         }
 
-        public void toggleConnect(object sender, RoutedEventArgs e)
+        private void toggleConnect(object sender, RoutedEventArgs e)
         {
             Console.WriteLine("toggleConnect");
 
             if (!validConnection())
             {
+                Application.Current.Dispatcher.Invoke(() => _radarClass.InitRadar(RadarCanvas, assistantSettings["RadarScale"] / maxRadarScale));
+
                 try
                 {
                     _fsConnect = new FsConnect();
@@ -273,7 +294,7 @@ namespace MSFS_Kinetic_Assistant
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine(ex.Message);
+                    addLogMessage(ex.Message);
                     return;
                 }
 
@@ -295,12 +316,16 @@ namespace MSFS_Kinetic_Assistant
                 changeButtonStatus(true, towToggleButton, true);
                 changeButtonStatus(true, towConnectButton, false);
                 changeButtonStatus(true, towInsertButton, true);
+                RadarScale.Maximum = maxRadarScale;
+
                 _fsConnect.RequestData(Requests.PlaneInfo, Definitions.PlaneInfo);
                 _fsConnect.RequestData(Requests.PlaneCommit, Definitions.PlaneCommit);
                 //_fsConnect.RequestFacilitiesList(Requests.Airport);
             }
             else
             {
+                Application.Current.Dispatcher.Invoke(() => _radarClass.ClearRadar(RadarCanvas));
+
                 if (towScanMode > TowScanMode.Disabled)
                 {
                     toggleScanning(null, null);
@@ -309,14 +334,14 @@ namespace MSFS_Kinetic_Assistant
                 try
                 {
                     showMessage("Kinetic Assistant disconnected", _fsConnect);
-                    Application.Current.Dispatcher.Invoke(() => playSound("error"));
+                    //Application.Current.Dispatcher.Invoke(() => playSound("error"));
                     _fsConnect.Disconnect();
                     _fsConnect.Dispose();
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine(ex.Message);
-                    addLogMessage(ex.Message);
+                    addLogMessage(ex.Message, 2);
                 }
 
                 _fsConnect = null;
@@ -335,7 +360,7 @@ namespace MSFS_Kinetic_Assistant
             }
         }
 
-        public bool validConnection()
+        private bool validConnection()
         {
             if (_fsConnect == null/* || !_fsConnect.Connected*/)
                 return false;
@@ -345,7 +370,7 @@ namespace MSFS_Kinetic_Assistant
 
 
         // WINCH START
-        public void toggleLaunchPrepare(object sender, RoutedEventArgs e)
+        private void toggleLaunchPrepare(object sender, RoutedEventArgs e)
         {
             Console.WriteLine("toggleLaunchPrepare");
 
@@ -361,10 +386,13 @@ namespace MSFS_Kinetic_Assistant
                     if (_planeInfoResponse.BrakeParkingPosition == 100 && (assistantSettings["realisticRestrictions"] == 0 || _planeInfoResponse.SimOnGround == 100 || _planeInfoResponse.AltitudeAboveGround <= _planeInfoResponse.StaticCGtoGround * 1.25))
                     {
                         lastPreparePressed = absoluteTime;
-                        Console.WriteLine("Creating winch");
+                        addLogMessage("Creating winch");
 
                         cableLength = assistantSettings["stringLength"];
                         _winchPosition = _mathClass.getWinchPosition(_planeInfoResponse, cableLength - 10);
+
+                        Application.Current.Dispatcher.Invoke(() => _radarClass.InsertWinch(RadarCanvas));
+                        Application.Current.Dispatcher.Invoke(() => RadarScale.Value = Math.Min(maxRadarScale, cableLength / 1000 * 1.2));
 
                         Console.WriteLine($"Current location: {_planeInfoResponse.Latitude * 180 / Math.PI} {_planeInfoResponse.Longitude * 180 / Math.PI}");
                         Console.WriteLine($"Winch location: {_winchPosition.location.Latitude * 180 / Math.PI} {_winchPosition.location.Longitude * 180 / Math.PI}");
@@ -390,7 +418,7 @@ namespace MSFS_Kinetic_Assistant
         }
 
         // INITIATE WINCH LAUNCH
-        public void initiateLaunch(object sender, RoutedEventArgs e)
+        private void initiateLaunch(object sender, RoutedEventArgs e)
         {
             Console.WriteLine("initiateLaunch");
 
@@ -407,7 +435,7 @@ namespace MSFS_Kinetic_Assistant
             }
         }
 
-        public void abortLaunch()
+        private void abortLaunch()
         {
             Console.WriteLine("abortLaunch");
 
@@ -420,18 +448,20 @@ namespace MSFS_Kinetic_Assistant
             else
             {
                 _winchPosition = null;
+                Application.Current.Dispatcher.Invoke(() => _radarClass.RemoveWinch(RadarCanvas));
                 launchTime = 0;
                 cableLength = 0;
             }
         }
 
-        public void processLaunch()
+        private void processLaunch()
         {
             bool applyForces;
 
             if (winchAbortInitiated)
             {
                 _winchPosition = null;
+                Application.Current.Dispatcher.Invoke(() => _radarClass.RemoveWinch(RadarCanvas));
                 launchTime = 0;
                 cableLength = 0;
                 winchAbortInitiated = false;
@@ -439,11 +469,13 @@ namespace MSFS_Kinetic_Assistant
             }
             else
             {
-
                 // GET ANGLE TO WINCH POSITION
                 winchDirection _winchDirection = _mathClass.getForceDirection(_winchPosition, _planeInfoResponse);
                 double targetVelocity = 0.514 * assistantSettings["targetSpeed"];
                 double bodyAcceleration = 0;
+
+                if (thermalsDebugActive > 0)
+                    Application.Current.Dispatcher.Invoke(() => _radarClass.UpdateWinch(RadarCanvas, _winchDirection, Math.Min(maxRadarScale, assistantSettings["RadarScale"])));
 
                 // GET DRAFT CABLE TENSION
                 double accelerationLimit = (assistantSettings["realisticFailures"] == 1 ? 6 : 30) * 9.81;
@@ -472,7 +504,7 @@ namespace MSFS_Kinetic_Assistant
                 }
 
                 // LEVEL UP GLIDER BEFORE LAUNCH
-                if (_planeInfoResponse.OnAnyRunway == 100 && launchTime != 0 && absoluteTime < launchTime)
+                if (_planeInfoResponse.OnAnyRunway == 100 && launchTime != 0 && (absoluteTime < launchTime || absoluteTime < (launchTime + 3) && _planeInfoResponse.AirspeedIndicated < 10 ))
                 {
                     _planeRotate.RotationVelocityBodyX = 0;
                     _planeRotate.RotationVelocityBodyY = 0;
@@ -488,7 +520,7 @@ namespace MSFS_Kinetic_Assistant
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine(ex.Message);
+                            addLogMessage(ex.Message);
                         }
                     }
                 }
@@ -514,13 +546,13 @@ namespace MSFS_Kinetic_Assistant
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine(ex.Message);
+                        addLogMessage(ex.Message);
                     }
                 }
             }
         }
 
-        public bool applyWinchForces(double bodyAcceleration, double accelerationLimit, winchDirection _winchDirection, double targetVelocity, string type, double connectionPoint)
+        private bool applyWinchForces(double bodyAcceleration, double accelerationLimit, winchDirection _winchDirection, double targetVelocity, string type, double connectionPoint)
         {
             if (double.IsNaN(bodyAcceleration) || lastFrameTiming == 0)
             {
@@ -532,7 +564,7 @@ namespace MSFS_Kinetic_Assistant
             {
                 double rnd = new Random().NextDouble();
                 double thrs = Math.Pow(10, assistantSettings["randomFailures"]) * lastFrameTiming * Math.Abs(bodyAcceleration) / accelerationLimit / 1000;
-                Console.WriteLine(rnd + " / " + thrs);
+                //Console.WriteLine(rnd + " / " + thrs);
 
                 if (rnd < thrs)
                 {
@@ -617,7 +649,7 @@ namespace MSFS_Kinetic_Assistant
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine(ex.Message);
+                            addLogMessage(ex.Message);
                         }
                     }
                 }
@@ -630,7 +662,7 @@ namespace MSFS_Kinetic_Assistant
         // WINCH END
 
         // TOW START
-        public void toggleScanning(object sender, RoutedEventArgs e)
+        private void toggleScanning(object sender, RoutedEventArgs e)
         {
             Console.WriteLine("toggleScanning");
 
@@ -641,7 +673,6 @@ namespace MSFS_Kinetic_Assistant
             if (!validConnection())
             {
                 Console.WriteLine("connection lost");
-                Application.Current.Dispatcher.Invoke(() => abortLaunchpad());
             }
             else
             {
@@ -656,11 +687,12 @@ namespace MSFS_Kinetic_Assistant
                 else // STOP SEARCH
                 {
                     towScanMode = TowScanMode.Disabled;
-
                     if (towingTarget != TARGETMAX)
                     {
                         toggleTowCable(towingTarget);
                     }
+
+                    Application.Current.Dispatcher.Invoke(() => _radarClass.clearRadarNearby(RadarCanvas));
 
                     _nearbyInfoResponse = new Dictionary<uint, winchPosition>();
 
@@ -670,19 +702,19 @@ namespace MSFS_Kinetic_Assistant
                     Application.Current.Dispatcher.Invoke(() => changeButtonStatus(true, towToggleButton, true, "SEARCH"));
                     Application.Current.Dispatcher.Invoke(() => changeButtonStatus(true, towConnectButton, false, "Attach To Closest"));
 
-                    toggleSidebarWindow(false);
+                    //toggleSidebarWindow(false);
                 }
             }
         }
 
-        public void toggleTowClosest(object sender, EventArgs e)
+        private void toggleTowClosest(object sender, EventArgs e)
         {
             attachTowCable(null, new EventArgs());
         }
 
-        public void aiTowPlane(object sender, EventArgs e)
+        private void aiTowPlane(object sender, EventArgs e)
         {
-            if (_fsConnect != null)
+            if (validConnection())
             {
                 if (assistantSettings["realisticRestrictions"] == 0 || _planeInfoResponse.BrakeParkingPosition == 0 && (_planeInfoResponse.SimOnGround == 100 || _planeInfoResponse.AltitudeAboveGround <= _planeInfoResponse.StaticCGtoGround * 1.25))
                 {
@@ -704,7 +736,8 @@ namespace MSFS_Kinetic_Assistant
 
                     if (towScanMode > TowScanMode.Disabled)
                     {
-                        towSearchRadius.SelectedIndex = 3;
+                        //towSearchRadius.SelectedIndex = 3;
+                        RadarScale.Value = 0.3;
                         towScanType.SelectedIndex = 1;
                         towToggledAltitude = _planeInfoResponse.Altitude;
 
@@ -720,7 +753,7 @@ namespace MSFS_Kinetic_Assistant
             }
         }
 
-        public void insertTowPlane()
+        private void insertTowPlane()
         {
             if (towScanMode == TowScanMode.Disabled)
             {
@@ -729,18 +762,18 @@ namespace MSFS_Kinetic_Assistant
 
             if (towScanMode > TowScanMode.Disabled)
             {
-                Console.WriteLine("Inserting AI tow plane");
+                addLogMessage("Inserting AI tow plane");
 
                 if (assistantSettings["realisticTowProcedures"] == 0)
                 {
                     GeoLocation newPlaneLocation = _mathClass.FindPointAtDistanceFrom(new GeoLocation(_planeInfoResponse.Latitude, _planeInfoResponse.Longitude), _planeInfoResponse.PlaneHeading, 0.08);
 
                     SIMCONNECT_DATA_INITPOSITION position = new SIMCONNECT_DATA_INITPOSITION();
-                    position.Altitude = 99999;
+                    //position.Altitude = 99999;
                     position.Latitude = newPlaneLocation.Latitude * 180 / Math.PI;
                     position.Longitude = newPlaneLocation.Longitude * 180 / Math.PI;
-                    position.Airspeed = 0;
-                    position.Pitch = -10;
+                    //position.Airspeed = 0;
+                    //position.Pitch = -10;
 
                     _fsConnect.CreateNonATCAircraft(position, towPlaneModel.Text, Requests.TowPlane);
                 }
@@ -753,7 +786,7 @@ namespace MSFS_Kinetic_Assistant
             }
         }
 
-        /*public void createFlightPlan()
+        /*private void createFlightPlan()
         {
             // FIND CLOSESD ICAO - BROKEN!!!
             KeyValuePair<double, SIMCONNECT_DATA_FACILITY_AIRPORT> closesAirport = new KeyValuePair<double, SIMCONNECT_DATA_FACILITY_AIRPORT>();
@@ -778,11 +811,11 @@ namespace MSFS_Kinetic_Assistant
             Console.WriteLine("Closest airport - " + closesAirport.Value.Icao + " distance " + closesAirport.Key);
         }*/
 
-        public void assignTowPlane(uint id, winchPosition pos)
+        private void assignTowPlane(uint id, winchPosition pos)
         {
             winchDirection direction = _mathClass.getForceDirection(pos, _planeInfoResponse);
 
-            double menuValue = 200;
+            double menuValue = 0.2;
             towCableDesired = 40;
             double cableLength = towCableDesired;
 
@@ -790,7 +823,8 @@ namespace MSFS_Kinetic_Assistant
 
             if (assistantSettings["realisticTowProcedures"] == 0)
             {
-                towSearchRadius.Text = menuValue.ToString(".0");
+                //towSearchRadius.Text = menuValue.ToString(".0");
+                RadarScale.Value = menuValue;
                 towCableDesired *= 2;
                 cableLength = towCableDesired - 10;
                 //teleportTowPlane(id);
@@ -798,13 +832,15 @@ namespace MSFS_Kinetic_Assistant
             }
             else if (direction.distance + 10 < towCableDesired)
             {
-                towSearchRadius.Text = menuValue.ToString(".0");
+                //towSearchRadius.Text = menuValue.ToString(".0");
+                RadarScale.Value = menuValue;
             }
             else
             {
                 cableLength = direction.distance;
                 menuValue = (cableLength + 10) * 1.5;
-                towSearchRadius.Text = menuValue.ToString(".0");
+                //towSearchRadius.Text = menuValue.ToString(".0");
+                RadarScale.Value = menuValue;
             }
 
             insertedTowPlane = new KeyValuePair<uint, bool>(id, true);
@@ -814,7 +850,7 @@ namespace MSFS_Kinetic_Assistant
             //showMessage("AI tow plane assigned", _fsConnect);
         }
 
-        public void teleportTowPlane(uint id)
+        private void teleportTowPlane(uint id)
         {
             GeoLocation newPlaneLocation = _mathClass.FindPointAtDistanceFrom(new GeoLocation(_planeInfoResponse.Latitude, _planeInfoResponse.Longitude), _planeInfoResponse.PlaneHeading, 0.08);
 
@@ -837,20 +873,20 @@ namespace MSFS_Kinetic_Assistant
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine(ex.Message);
+                    addLogMessage(ex.Message);
                 }
             }
         }
 
-        public void assignFlightPlan(uint id)
+        private void assignFlightPlan(uint id)
         {
             if (plnPath != "")
                 _fsConnect.AISetAircraftFlightPlan(id, plnPath, Definitions.TowPlane);
         }
 
-        public void nearbyInterval(object sender, EventArgs e)
+        private void nearbyInterval(object sender, EventArgs e)
         {
-            if (_fsConnect != null)
+            if (validConnection())
             {
                 if (threadServer != null && server != null)
                 {
@@ -881,6 +917,7 @@ namespace MSFS_Kinetic_Assistant
 
                     SortedDictionary<double, Button> nearbyDict = new SortedDictionary<double, Button>();
                     SortedDictionary<double, Button> farDict = new SortedDictionary<double, Button>();
+                    KeyValuePair<double, Button> curr = new KeyValuePair<double, Button>();
 
                     try
                     {
@@ -919,11 +956,10 @@ namespace MSFS_Kinetic_Assistant
 
                             // AVAILABLE OBJECTS + CURRENT TARGET
                             if ((assistantSettings["realisticRestrictions"] == 0 || _planeInfoResponse.BrakeParkingPosition == 0 && _planeInfoResponse.SimOnGround == 100) &&
-                                dir.distance <= assistantSettings["towSearchRadius"] || obj.Key == towingTarget)
+                                dir.distance <= 1000 * Math.Min(allowedRadarScale, assistantSettings["RadarScale"]) || obj.Key == towingTarget)
                             {
                                 label.Foreground = new SolidColorBrush(obj.Key == towingTarget ? Colors.DarkRed : Colors.DarkGreen);
                                 label.BorderBrush = new SolidColorBrush(obj.Key == towingTarget ? Colors.DarkRed : Colors.DarkGreen);
-                                label.Cursor = Cursors.Arrow;
                                 label.Margin = new Thickness(5, 5, 5, 5);
                                 label.Height = 26;
                                 label.Click += attachTowCable;
@@ -935,13 +971,16 @@ namespace MSFS_Kinetic_Assistant
                                     if ((_nearbyInfoResponse.ContainsKey(obj.Key) || _nearbyInfoResponseLast.ContainsKey(obj.Key) || _nearbyInfoResponsePreLast.ContainsKey(obj.Key)) &&
                                         (assistantSettings["realisticRestrictions"] == 0 || _planeInfoResponse.BrakeParkingPosition == 0 && (_planeInfoResponse.SimOnGround == 100 || _planeInfoResponse.AltitudeAboveGround <= _planeInfoResponse.StaticCGtoGround * 1.25)))
                                     {
-                                        Console.WriteLine("Towplane found");
+                                        addLogMessage("Towplane found");
                                         assignTowPlane(obj.Key, obj.Value);
                                     }
                                 }
 
                                 if (obj.Key == towingTarget)
+                                {
                                     currentTarget.Children.Add(label);
+                                    curr = new KeyValuePair<double, Button>(dir.distance, label);
+                                }
                                 else
                                 {
                                     if (!nearbyDict.ContainsKey(dir.distance))
@@ -971,7 +1010,7 @@ namespace MSFS_Kinetic_Assistant
 
                             if (abort)
                             {
-                                Console.WriteLine("Tow plane lost");
+                                addLogMessage("Tow plane lost");
                                 toggleTowCable(towingTarget);
                             }
                         }
@@ -1011,8 +1050,19 @@ namespace MSFS_Kinetic_Assistant
                         foreach (KeyValuePair<Double, Button> btn in farDict)
                             farObjects.Children.Add(btn.Value);
 
+                        if (curr.Key != 0)
+                        {
+                            nearbyDict.Add(curr.Key, curr.Value);
+                        }
+
+                        if (thermalsDebugActive > 0)
+                            Application.Current.Dispatcher.Invoke(() => _radarClass.InsertRadarNearby(RadarCanvas, nearbyDict, this));
+
                     }
-                    catch (Exception ex) { Console.WriteLine(ex.Message); }
+                    catch (Exception ex)
+                    {
+                        addLogMessage(ex.Message);
+                    }
 
                 }
             }
@@ -1035,7 +1085,7 @@ namespace MSFS_Kinetic_Assistant
             toggleTowCable(newTarget);
         }
 
-        public void toggleTowCable(uint id, winchPosition position = null, double length = 0)
+        private void toggleTowCable(uint id, winchPosition position = null, double length = 0)
         {
             if (towingTarget == id)
             {
@@ -1079,7 +1129,7 @@ namespace MSFS_Kinetic_Assistant
             Application.Current.Dispatcher.Invoke(() => nearbyInterval(new object(), new EventArgs()));
         }
 
-        public void processTowing()
+        private void processTowing()
         {
             Console.WriteLine(Environment.NewLine + "processTowing");
 
@@ -1127,7 +1177,7 @@ namespace MSFS_Kinetic_Assistant
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine(ex.Message);
+                        addLogMessage(ex.Message);
                     }
                 }
 
@@ -1140,7 +1190,7 @@ namespace MSFS_Kinetic_Assistant
 
 
         // LAUNCHPAD START
-        public void toggleLaunchpadPrepare(object sender, RoutedEventArgs e)
+        private void toggleLaunchpadPrepare(object sender, RoutedEventArgs e)
         {
             Console.WriteLine("toggleLaunchpadPrepare");
 
@@ -1174,7 +1224,7 @@ namespace MSFS_Kinetic_Assistant
                 }
             }
         }
-        public void abortLaunchpad()
+        private void abortLaunchpad()
         {
             Console.WriteLine("abortLaunchpad");
             Application.Current.Dispatcher.Invoke(() => changeButtonStatus(_fsConnect != null ? true : false, catapultlaunchButton, true, "Ready to launch"));
@@ -1190,7 +1240,7 @@ namespace MSFS_Kinetic_Assistant
 
             }
         }
-        public void processLaunchpad()
+        private void processLaunchpad()
         {
             if (launchpadAbortInitiated)
             {
@@ -1228,7 +1278,7 @@ namespace MSFS_Kinetic_Assistant
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine(ex.Message);
+                            addLogMessage(ex.Message);
                         }
                     }
                 }
@@ -1248,14 +1298,14 @@ namespace MSFS_Kinetic_Assistant
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine(ex.Message);
+                    addLogMessage(ex.Message);
                 }
             }
         }
         // LAUNCHPAD END
 
         // LANDING START
-        public void toggleLandingPrepare(object sender, RoutedEventArgs e)
+        private void toggleLandingPrepare(object sender, RoutedEventArgs e)
         {
             Console.WriteLine("toggleLandingPrepare");
 
@@ -1276,7 +1326,7 @@ namespace MSFS_Kinetic_Assistant
                 arrestorsAbortInitiated = true;
             }
         }
-        public void processLanding()
+        private void processLanding()
         {
             if (arrestorsAbortInitiated)
             {
@@ -1348,7 +1398,7 @@ namespace MSFS_Kinetic_Assistant
                             }
                             catch (Exception ex)
                             {
-                                Console.WriteLine(ex.Message);
+                                addLogMessage(ex.Message);
                             }
                         }
 
@@ -1372,14 +1422,14 @@ namespace MSFS_Kinetic_Assistant
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine(ex.Message);
+                    addLogMessage(ex.Message);
                 }
             }
         }
         // LANDING END
 
         // THERMALS START
-        public void thermalsLoadMap(object sender, RoutedEventArgs e)
+        private void thermalsLoadMap(object sender, RoutedEventArgs e)
         {
             OpenFileDialog openFileDialog = new OpenFileDialog();
             openFileDialog.Filter = "Iittle Navmap Userpoints (*.csv)|*.csv";
@@ -1394,14 +1444,16 @@ namespace MSFS_Kinetic_Assistant
             }
         }
 
-        public void thermalsClear(object sender, RoutedEventArgs e)
+        private void thermalsClear(object sender, RoutedEventArgs e)
         {
             thermalsList = new List<winchPosition>();
+            Application.Current.Dispatcher.Invoke(() => _radarClass.clearRadarThermals(RadarCanvas, "Thermal"));
             thermalsListAPI = new List<winchPosition>();
+            Application.Current.Dispatcher.Invoke(() => _radarClass.clearRadarThermals(RadarCanvas, "ThermalAPI"));
             thermalsMapPath.Text = "No thermals loaded";
         }
 
-        public void enableApiThermals(Button btn, bool enable, bool force = false)
+        private void enableApiThermals(Button btn, bool enable, bool force = false)
         {
 
             Application.Current.Dispatcher.Invoke(() => changeButtonStatus(!enable, btn));
@@ -1410,7 +1462,7 @@ namespace MSFS_Kinetic_Assistant
             {
                 if (force || (!assistantSettings.ContainsKey("KK7Autoload") || assistantSettings["KK7Autoload"] == 0) && (!assistantSettings.ContainsKey("OpenAipAutoload") || assistantSettings["OpenAipAutoload"] == 0))
                 {
-                    Console.WriteLine("diableApiThermals");
+                    Console.WriteLine("dsiableApiThermals");
                     thermalsListAPI = new List<winchPosition>();
                     apiThermalsLoadedPosition = null;
                     apiThermalsLoadedTime = 0;
@@ -1429,7 +1481,7 @@ namespace MSFS_Kinetic_Assistant
             }
         }
 
-        public void loadThermalsApiData()
+        private void loadThermalsApiData()
         {
             if ((assistantSettings["KK7Autoload"] == 1 || assistantSettings["OpenAipAutoload"] == 1) && _planeInfoResponse.Latitude != 0 && _planeInfoResponse.Longitude != 0)
             {
@@ -1520,7 +1572,7 @@ namespace MSFS_Kinetic_Assistant
             Application.Current.Dispatcher.Invoke(() => thermalsMapPath.Text = thermalsList.Count + thermalsListAPI.Count > 0 ? (thermalsList.Count + thermalsListAPI.Count).ToString() + " thermals total" : "No thermals loaded");
         }
 
-        public double[] getThermalsBounds(GeoLocation coords, bool returnDegree)
+        private double[] getThermalsBounds(GeoLocation coords, bool returnDegree)
         {
             double lat = coords.Latitude * 180 / Math.PI;
             double lon = coords.Longitude * 180 / Math.PI;
@@ -1539,7 +1591,7 @@ namespace MSFS_Kinetic_Assistant
             };
         }
 
-        public bool coordinateInsideBounds(GeoLocation apiThermalsLoadedPosition, double[] bounds)
+        private bool coordinateInsideBounds(GeoLocation apiThermalsLoadedPosition, double[] bounds)
         {
             if (apiThermalsLoadedPosition.Latitude < bounds[0] || apiThermalsLoadedPosition.Latitude > bounds[2] || apiThermalsLoadedPosition.Longitude < bounds[1] || apiThermalsLoadedPosition.Longitude > bounds[3])
             {
@@ -1549,8 +1601,11 @@ namespace MSFS_Kinetic_Assistant
             return true;
         }
 
-        public void insertThermals(string content)
+        private void insertThermals(string content)
         {
+            //List<winchPosition> radarThermals = new List<winchPosition>();
+            Application.Current.Dispatcher.Invoke(() => _radarClass.clearRadarThermals(RadarCanvas, "Thermal"));
+
             foreach (string line in content.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None))
             { // Location,,thermal,40.17048,-111.96616,5000,11.95587,10,,,250,2021-01-04T23:32:47.770,
                 if (!String.IsNullOrWhiteSpace(line))
@@ -1567,8 +1622,9 @@ namespace MSFS_Kinetic_Assistant
                             (data[7].Contains(" ") && double.TryParse(data[7].Split(' ')[0].Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out radius) && double.TryParse(data[7].Split(' ')[1].Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out strength) ||
                             double.TryParse(data[7].Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out radius)))
                         {
-                            winchPosition _thermalPosition = new winchPosition(new GeoLocation(lat / 180 * Math.PI, lng / 180 * Math.PI), 0.305 * alt, 1852 * radius, strength / 1.9);
+                            winchPosition _thermalPosition = new winchPosition(new GeoLocation(lat / 180 * Math.PI, lng / 180 * Math.PI), 0.305 * alt, 1852 * radius, strength / 1.9 * 4);
                             thermalsList.Add(_thermalPosition);
+                            //radarThermals.Add(_thermalPosition);
                         }
                         else
                         {
@@ -1581,10 +1637,15 @@ namespace MSFS_Kinetic_Assistant
                     }
                 }
             }
+
+            if (thermalsList.Count > 0)
+                Application.Current.Dispatcher.Invoke(() => _radarClass.insertRadarThermals(RadarCanvas, thermalsList, "Thermal"));
         }
 
-        public void insertApiThermals(string content, double[] bounds)
+        private void insertApiThermals(string content, double[] bounds)
         {
+            Application.Current.Dispatcher.Invoke(() => _radarClass.clearRadarThermals(RadarCanvas, "ThermalAPI"));
+
             foreach (string line in content.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None))
             { // Location,,thermal,40.17048,-111.96616,5000,11.95587,10,,,250,2021-01-04T23:32:47.770,
                 if (!String.IsNullOrWhiteSpace(line) && !line.Contains("latitude"))
@@ -1593,7 +1654,7 @@ namespace MSFS_Kinetic_Assistant
                     if (data.Length >= 4)
                     {
                         double radius = 0.9;
-                        double strength = 4;
+                        double strength = 15; // KNOTS
 
                         if (double.TryParse(data[0], NumberStyles.Any, CultureInfo.InvariantCulture, out double lat) &&
                             double.TryParse(data[1], NumberStyles.Any, CultureInfo.InvariantCulture, out double lng) &&
@@ -1620,7 +1681,7 @@ namespace MSFS_Kinetic_Assistant
                                 {
                                     double distance = Math.Abs(_mathClass.findDistanceBetweenPoints(lat, lng, therm.location.Latitude, therm.location.Longitude));
 
-                                    if ((distance - radius - therm.radius) < 10000 * (modifier * therm.airspeed * 1.9 / strength))
+                                    if ((distance - radius - therm.radius) < 10000 * (modifier * therm.airspeed / strength))
                                     {
                                         cnt = true;
                                         break;
@@ -1648,8 +1709,11 @@ namespace MSFS_Kinetic_Assistant
                     }
                 }
             }
+
+            if (thermalsListAPI.Count > 0)
+                Application.Current.Dispatcher.Invoke(() => _radarClass.insertRadarThermals(RadarCanvas, thermalsListAPI, "ThermalAPI"));
         }
-        public void kk7CsvExport(object sender, RoutedEventArgs e)
+        private void kk7CsvExport(object sender, RoutedEventArgs e)
         {
             if (thermalsListAPI.Count > 0)
             {
@@ -1657,7 +1721,7 @@ namespace MSFS_Kinetic_Assistant
 
                 foreach (winchPosition thermal in thermalsListAPI)
                 {
-                    csv += "Location,,thermal," + (thermal.location.Latitude * 180 / Math.PI) + "," + (thermal.location.Longitude * 180 / Math.PI) + ",0,1," + (thermal.radius / 1852).ToString("0.0").Replace(',', '.') + " " + (thermal.airspeed * 1.9).ToString("0.0").Replace(',', '.') + ",,,250,2020-01-01T00:00:00.000," + Environment.NewLine;
+                    csv += "Location,,thermal," + (thermal.location.Latitude * 180 / Math.PI).ToString(CultureInfo.InvariantCulture) + "," + (thermal.location.Longitude * 180 / Math.PI).ToString(CultureInfo.InvariantCulture) + ",0,1," + (thermal.radius / 1852).ToString("0.0", CultureInfo.InvariantCulture) + " " + (thermal.airspeed * 1.9 / 4).ToString("0.0", CultureInfo.InvariantCulture) + ",,,250,2020-01-01T00:00:00.000," + Environment.NewLine;
                 }
 
                 SaveFileDialog sfd = new SaveFileDialog();
@@ -1678,7 +1742,7 @@ namespace MSFS_Kinetic_Assistant
                 }
             }
         }
-        public void toggleThermals(object sender, RoutedEventArgs e)
+        private void toggleThermals(object sender, RoutedEventArgs e)
         {
             Console.WriteLine("toggleThermals");
 
@@ -1704,7 +1768,7 @@ namespace MSFS_Kinetic_Assistant
                 windVelocity = 0;
                 dayTimeModifier = 1;
                 overcastModifier = 1;
-    
+
                 _fsConnect.RequestData(Requests.WeatherData, Definitions.WeatherData);
 
                 thermalsWorking = true;
@@ -1713,7 +1777,7 @@ namespace MSFS_Kinetic_Assistant
                 Application.Current.Dispatcher.Invoke(() => changeButtonStatus(false, thermalsToggleButton, true, "Disable thermals"));
             }
         }
-        public void processThermals(List<winchPosition> list, bool limit = false)
+        private void processThermals(List<winchPosition> list, bool API = false)
         {
             // WIND MODIFIERS
             double windModifier = 0;
@@ -1724,9 +1788,10 @@ namespace MSFS_Kinetic_Assistant
                 thermalLeaning = _planeInfoResponse.AltitudeAboveGround * windModifier;
             }
 
+            int id = 0;
             foreach (winchPosition thermal in list)
             {
-                double inversionLayer = 500 * 0.305;
+                double inversionLayer = _planeInfoResponse.AltitudeAboveGround / 3 * 0.305;
                 double height = 0;
                 double acAltitude = 0;
                 double thermalRadius = thermal.radius;
@@ -1739,12 +1804,13 @@ namespace MSFS_Kinetic_Assistant
 
                 GeoLocation thermalCenter = new GeoLocation(thermal.location.Latitude, thermal.location.Longitude);
 
-                // ALTITUDE TYPE
+                // AGL
                 if (thermal.alt >= 1000)
                 {
                     height = thermal.alt;
                     acAltitude = _planeInfoResponse.AltitudeAboveGround;
                 }
+                // MSL
                 else
                 {
                     height = Math.Max(0, assistantSettings["thermalsHeight"] * 0.305) + thermal.alt;
@@ -1752,363 +1818,401 @@ namespace MSFS_Kinetic_Assistant
                 }
 
                 thermalRadius *= 1 + windModifier;
-                double topEdge = height + inversionLayer;
+                double topEdge = height - inversionLayer;
 
-                if (acAltitude < topEdge && thermalRadius > 0)
+                if (thermalRadius > 0)
                 {
+                    double finalModifier = 0.1;
+
                     // LEANING
                     if (thermalLeaning > 10)
                     {
                         thermalCenter = _mathClass.FindPointAtDistanceFrom(thermalCenter, windDirection - Math.PI, thermalLeaning / 1000);
                     }
 
-                    winchPosition thermalTemp = new winchPosition(thermalCenter, topEdge, thermalRadius);
-                    thermalTemp.alt = _planeInfoResponse.Altitude - 10 * thermalTemp.radius;
+                    winchPosition thermalTemp = new winchPosition(thermalCenter, _planeInfoResponse.Altitude - 10 * thermalRadius, thermalRadius);
                     winchDirection _thermalDirection = _mathClass.getForceDirection(thermalTemp, _planeInfoResponse);
 
-                    if (_thermalDirection.groundDistance < thermalTemp.radius)
+                    if (acAltitude < topEdge + 2 * inversionLayer && _thermalDirection.groundDistance < thermalTemp.radius)
                     {
                         //Console.WriteLine("Thermal leaning: " + thermalLeaning.ToString("0.0") + " width scale: " + (1 + windModifier));
 
-                        double horizontalModifier = Math.Pow(Math.Abs(1 - _thermalDirection.groundDistance / thermalTemp.radius), 0.25); // DISTANCE TO THE CENTER
-                        double verticalModifier = acAltitude < topEdge - inversionLayer ?
-                            Math.Pow(Math.Abs(acAltitude / (topEdge - inversionLayer)), 0.25) : // DISTANCE TO THE TOP + INVERSION
-                            (topEdge - acAltitude - inversionLayer / 2) / (inversionLayer / 2); // ABOVE INVERSION
+                        double horizontalModifier = Math.Pow(Math.Abs(1 - _thermalDirection.groundDistance / thermalTemp.radius), 0.5); // DISTANCE TO THE CENTER
+                        double verticalModifier = acAltitude < topEdge ?
+                            Math.Pow(Math.Abs(acAltitude / (topEdge)), 0.25) : // UNDER INVERSION
+                            (inversionLayer - (acAltitude - topEdge)) / (inversionLayer); // ABOVE INVERSION
                         double pitchBankModifier = Math.Abs(Math.Cos(_planeInfoResponse.PlaneBank)) * Math.Abs(Math.Cos(_planeInfoResponse.PlanePitch)); // ROTATION
                         double airspeedModifier = Math.Pow(Math.Abs(1 - _planeCommit.VelocityBodyZ / 100), 0.25); // ATTEMPT TO PREVENT OVERSPEED
                         double ambientModifier = (1 - windModifier) * overcastModifier * dayTimeModifier;
 
-                        double finalModifier = horizontalModifier * verticalModifier * pitchBankModifier * airspeedModifier * ambientModifier;
+                        finalModifier = horizontalModifier * verticalModifier * pitchBankModifier * airspeedModifier * ambientModifier;
+                        double liftAmount = thermal.airspeed * finalModifier;
 
-                        double liftAmount = -thermal.airspeed * finalModifier;
-                        _planeCommit.WaterRudderHandlePosition = horizontalModifier * verticalModifier * 100;
+                        // COMPARE VERTICAL VELOCITY AND UPLIFT
+                        Console.WriteLine("LiftY: " + liftAmount + " VerticalSpeed: " + _planeInfoResponse.VerticalSpeed);
+                        if (acAltitude < topEdge && _planeInfoResponse.VerticalSpeed < liftAmount)
+                        {
+                            liftAmount = Math.Min(10, liftAmount - _planeInfoResponse.VerticalSpeed);
+                        }
+                        else
+                        {
+                            liftAmount = 0;
+                        }
 
-                        _planeCommit.VelocityBodyX += _thermalDirection.localForceDirection.X * liftAmount * lastFrameTiming;
-                        _planeCommit.VelocityBodyY += _thermalDirection.localForceDirection.Y * liftAmount * lastFrameTiming;
-                        _planeCommit.VelocityBodyZ += _thermalDirection.localForceDirection.Z * liftAmount * lastFrameTiming;
+                        //Console.WriteLine("VelocityBodyY: " + _planeCommit.VelocityBodyY + " / " + (_planeCommit.VelocityBodyY + ((double)_thermalDirection.localForceDirection.Y) * liftAmount) + " (" + liftAmount + ")");
+                        Console.WriteLine("Thermal direction: x" + (-(double)_thermalDirection.localForceDirection.X) * liftAmount + " y" + ((double)_thermalDirection.localForceDirection.Y) * liftAmount + " z" + (-(double)_thermalDirection.localForceDirection.Z) * liftAmount + " (" + liftAmount + ")");
+                        _planeCommit.VelocityBodyX -= ((double)_thermalDirection.localForceDirection.X) * liftAmount * lastFrameTiming;
+                        _planeCommit.VelocityBodyY -= ((double)_thermalDirection.localForceDirection.Y) * liftAmount * lastFrameTiming / 2;
+                        _planeCommit.VelocityBodyZ += ((double)_thermalDirection.localForceDirection.Z) * liftAmount * lastFrameTiming;
 
                         // FORWARD SPEED COMPENSATION
-                        _planeCommit.VelocityBodyZ += _planeCommit.VelocityBodyZ * Math.Pow(Math.Abs(lastFrameTiming), 2.5) * horizontalModifier * verticalModifier * airspeedModifier;
-
+                        _planeCommit.VelocityBodyZ -= ((double)_thermalDirection.localForceDirection.Y) * liftAmount * lastFrameTiming / 2;
+                        //_planeCommit.VelocityBodyZ += _planeCommit.VelocityBodyZ * Math.Pow(Math.Abs(lastFrameTiming), 2.5) * horizontalModifier * verticalModifier * airspeedModifier;
                         if (!double.IsNaN(_planeCommit.VelocityBodyX) && !double.IsNaN(_planeCommit.VelocityBodyY) && !double.IsNaN(_planeCommit.VelocityBodyZ))
                         {
                             try
                             {
-                                if (finalModifier > 0.01)
+                                if (liftAmount != 0.0)
                                 {
                                     _fsConnect.UpdateData(Definitions.PlaneCommit, _planeCommit);
                                 }
-                                string bar = "||||||||||||||||||||||||||||||||||||||||||||||||||";
-
-                                if (thermalsDebugActive)
-                                {
-                                    Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Children.Add(makeTextBlock("To center:  " + bar.Substring(0, (int)(horizontalModifier * 100 / 4)), Colors.Black, 12)));
-                                    Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Children.Add(makeTextBlock("To top:     " + bar.Substring(0, (int)(verticalModifier * 100 / 4)), (height - acAltitude) > 0 ? Colors.Black : Colors.DarkRed, 12)));
-                                    Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Children.Add(makeTextBlock("Pitch/bank: " + bar.Substring(0, (int)(pitchBankModifier * 100 / 4)), Colors.Black, 12)));
-                                    Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Children.Add(makeTextBlock("Ambient:    " + bar.Substring(0, (int)(ambientModifier * 100 / 4)), Colors.Black, 12)));
-                                    Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Children.Add(makeTextBlock("Total lift: " + bar.Substring(0, (int)(finalModifier * 100 / 4)) + Environment.NewLine + Environment.NewLine, finalModifier > 0.01 ? Colors.Black : Colors.DarkRed, 12)));
-                                }
-
                             }
                             catch (Exception ex)
                             {
-                                Console.WriteLine(ex.Message);
-                            }
-
-                            // STOP IF API DATA
-                            if (limit)
-                            {
-                                break;
+                                addLogMessage(ex.Message);
                             }
                         }
+                    }
 
+                    if (thermalsDebugActive > 0 && (!assistantSettings.ContainsKey("RadarScale") || scaleRefresh > 0 || _thermalDirection.groundDistance / 1.25 < Math.Min(allowedRadarScale, assistantSettings["RadarScale"]) * 1000 + thermalTemp.radius))
+                    {
+                        Application.Current.Dispatcher.Invoke(() => _radarClass.updateRadarThermals(RadarCanvas, (!API ? "Thermal_" : "ThermalAPI_") + id, _thermalDirection, thermalTemp, finalModifier, Math.Min(maxRadarScale, assistantSettings["RadarScale"])));
                     }
                 }
+
+                id++;
             }
+
+            if (scaleRefresh > 0)
+                scaleRefresh--;
         }
         // THERMALS END
 
         // DATA EXCHANGE
-        public void HandleReceivedFsData(object sender, FsDataReceivedEventArgs e)
+        private void HandleReceivedFsData(object sender, FsDataReceivedEventArgs e)
         {
-            try
+            if (validConnection())
             {
-                // COMMON DATA
-                if (e.RequestId == (uint)Requests.PlaneInfo)
+                try
                 {
-                    //Console.WriteLine(JsonConvert.SerializeObject(e.Data, Formatting.Indented));
-                    _planeInfoResponse = (PlaneInfoResponse)(e.Data);
-
-                    absoluteTime = _planeInfoResponse.AbsoluteTime;
-
-                    trackControlChanges();
-
-                    // UPDATE KK7 DATA
-                    if ((assistantSettings.ContainsKey("KK7Autoload") && assistantSettings["KK7Autoload"] == 1 || assistantSettings.ContainsKey("OpenAipAutoload") && assistantSettings["OpenAipAutoload"] == 1) &&
-                        thermalsWorking && _planeInfoResponse.Latitude != 0 && _planeInfoResponse.Longitude != 0 && _planeInfoResponse.AbsoluteTime > 20 + apiThermalsLoadedTime)
+                    // COMMON DATA
+                    if (e.RequestId == (uint)Requests.PlaneInfo)
                     {
-                        if (apiThermalsLoadedPosition == null)
+                        //Console.WriteLine(JsonConvert.SerializeObject(e.Data, Formatting.Indented));
+                        _planeInfoResponseLast = _planeInfoResponse;
+                        _planeInfoResponse = (PlaneInfoResponse)(e.Data);
+
+                        absoluteTime = _planeInfoResponse.AbsoluteTime;
+
+                        trackControlChanges();
+
+                        Application.Current.Dispatcher.Invoke(() => VerticalWindPos.Height = Math.Max(0, _planeInfoResponse.AmbientWindY * 1.94) * 6.25);
+                        Application.Current.Dispatcher.Invoke(() => VerticalWindNeg.Height = Math.Abs(Math.Min(0, _planeInfoResponse.AmbientWindY * 1.94) * 6.25));
+
+                        // UPDATE KK7 DATA
+                        if ((assistantSettings.ContainsKey("KK7Autoload") && assistantSettings["KK7Autoload"] == 1 || assistantSettings.ContainsKey("OpenAipAutoload") && assistantSettings["OpenAipAutoload"] == 1) &&
+                            thermalsWorking && _planeInfoResponse.Latitude != 0 && _planeInfoResponse.Longitude != 0 && _planeInfoResponse.AbsoluteTime > 20 + apiThermalsLoadedTime)
                         {
-                            loadThermalsApiData();
+                            if (apiThermalsLoadedPosition == null)
+                            {
+                                loadThermalsApiData();
+                            }
+                            else
+                            {
+                                double[] bounds = getThermalsBounds(apiThermalsLoadedPosition, false);
+                                // S W N E
+                                if (!coordinateInsideBounds(new GeoLocation(_planeInfoResponse.Latitude, _planeInfoResponse.Longitude), bounds))
+                                {
+                                    addLogMessage($"Plane outside of loaded thermals area: {_planeInfoResponse.Latitude:F5} {_planeInfoResponse.Longitude:F5} - {bounds[0]:F5} {bounds[1]:F5} {bounds[2]:F5} {bounds[3]:F5} ");
+                                    loadThermalsApiData();
+                                }
+                            }
+                        }
+
+                        if (thermalsDebugActive > 0)
+                            Application.Current.Dispatcher.Invoke(() => _radarClass.updateCompassWind(RadarCanvas, _planeInfoResponse.PlaneHeading, _weatherReport.AmbientWindDirection, _weatherReport.AmbientWindVelocity * 1.94384));
+                    }
+                    // LAUNCH DATA
+                    else if (e.RequestId == (uint)Requests.PlaneCommit)
+                    {
+                        //Console.WriteLine(JsonConvert.SerializeObject(e.Data, Formatting.Indented));
+                        _planeCommitLast = _planeCommit;
+                        _planeCommit = (PlaneInfoCommit)e.Data;
+
+                        absoluteTime = _planeCommit.AbsoluteTime;
+
+                        // PAUSE?
+                        if (_planeInfoResponse.AirspeedIndicated == _planeInfoResponseLast.AirspeedIndicated &&
+                            _planeInfoResponse.GpsGroundSpeed == _planeInfoResponseLast.GpsGroundSpeed &&
+                            _planeInfoResponse.Altitude == _planeInfoResponseLast.Altitude &&
+                            _planeInfoResponse.PlaneBank == _planeInfoResponseLast.PlaneBank &&
+                            _planeInfoResponse.PlanePitch == _planeInfoResponseLast.PlanePitch)
+                        {
+                            lastFrameTiming = 0;
                         }
                         else
                         {
-                            double[] bounds = getThermalsBounds(apiThermalsLoadedPosition, false);
-                            // S W N E
-                            if (!coordinateInsideBounds(new GeoLocation(_planeInfoResponse.Latitude, _planeInfoResponse.Longitude), bounds))
+                            lastFrameTiming = absoluteTime - swLast;
+                        }
+
+                        if (lastFrameTiming > 0.001 && lastFrameTiming <= 1.0 && _planeInfoResponse.IsSlewActive != 100)
+                        {
+                            // CHECK WINCH LAUNCH STANDBY
+                            if (_planeInfoResponse.BrakeParkingPosition == 0 && _winchPosition != null && launchTime == 0)
                             {
-                                Console.WriteLine($"Plane outside of loaded thermals area: {_planeInfoResponse.Latitude:F5} {_planeInfoResponse.Longitude:F5} - {bounds[0]:F5} {bounds[1]:F5} {bounds[2]:F5} {bounds[3]:F5} ");
-                                loadThermalsApiData();
+                                initiateLaunch(new object(), new RoutedEventArgs());
+                            }
+                            // APPLY PHYSICS IS LAUNCH ACTIVE
+                            if (lastFrameTiming != 0 && _winchPosition != null)
+                            {
+                                processLaunch();
+                            }
+                            // ARRESTING PHYSICS
+                            if (_carrierPosition != null)
+                            {
+                                processLanding();
+                            }
+                            // LAUNCHPAD PHYSICS
+                            if (targedCatapultVelocity != 0)
+                            {
+                                processLaunchpad();
+                            }
+                            // THERMALS PHYSICS
+                            if (thermalsWorking)
+                            {
+                                //Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Children.Clear());
+
+                                if (_planeInfoResponse.AirspeedIndicated < 100)
+                                {
+                                    processThermals(thermalsList);
+                                    processThermals(thermalsListAPI, true);
+                                }
+                            }
+                        }
+
+                        swLast = absoluteTime;
+                    }
+                    // ROTATION DATA
+                    else if (e.RequestId == (uint)Requests.PlaneRotate)
+                    {
+                        //Console.WriteLine(JsonConvert.SerializeObject(e.Data, Formatting.Indented));
+                        _planeRotate = (PlaneInfoRotate)e.Data;
+                    }
+                    // NEARBY DATA
+                    else if (e.RequestId == (uint)Requests.NearbyObjects)
+                    {
+                        //Console.WriteLine(e.ObjectID);
+                        //Console.WriteLine(JsonConvert.SerializeObject(e.Data, Formatting.Indented));
+                        NearbyInfoResponse response = (NearbyInfoResponse)e.Data;
+
+                        if (_nearbyInfoResponseLast.ContainsKey(e.ObjectID)) { _nearbyInfoResponsePreLast[e.ObjectID] = _nearbyInfoResponseLast[e.ObjectID]; }
+                        if (_nearbyInfoResponse.ContainsKey(e.ObjectID)) { _nearbyInfoResponseLast[e.ObjectID] = _nearbyInfoResponse[e.ObjectID]; }
+                        winchPosition nearbyPosition = new winchPosition(new GeoLocation(response.Latitude, response.Longitude), response.Altitude, 0, response.Airspeed, response.FlightNumber == "9999" || insertedTowPlane.Key == e.ObjectID ? "Tow Plane" : response.Title, response.Category);
+                        _nearbyInfoResponse[e.ObjectID] = nearbyPosition;
+
+                        // TOWING IN PROCESS
+                        if (towingTarget == e.ObjectID)
+                        {
+                            processTowing();
+                        }
+
+                        // RADAR
+                        if (thermalsDebugActive > 0)
+                            Application.Current.Dispatcher.Invoke(() => _radarClass.updateRadarNearby(RadarCanvas, e.ObjectID, _mathClass.getForceDirection(nearbyPosition, _planeInfoResponse), nearbyPosition, towingTarget == e.ObjectID, Math.Min(maxRadarScale, assistantSettings["RadarScale"])));
+
+                        if (response.FlightNumber == "9999" || insertedTowPlane.Key == e.ObjectID)
+                        {
+                            bool AIhold = assistantSettings["realisticTowProcedures"] == 0 && insertTowPlanePressed != 0 && _planeInfoResponse.AbsoluteTime - insertTowPlanePressed < AIholdInterval;
+                            // HOLD INSERTED PLANE FOR A WHILE
+                            if (AIhold)
+                            {
+                                Console.WriteLine("Holding AI tow plane #" + e.ObjectID);
+                                TowInfoResponse towInfo = new TowInfoResponse();
+                                towInfo.Altitude = response.Altitude;
+                                towInfo.Latitude = response.Latitude;
+                                towInfo.Longitude = response.Longitude;
+                                towInfo.Heading = response.Heading;
+                                towInfo.Bank = 0;
+                                towInfo.VelocityBodyX = 0;
+                                towInfo.VelocityBodyY = 0;
+                                towInfo.VelocityBodyZ = 0;
+
+                                if (!double.IsNaN(towInfo.Altitude) && !double.IsNaN(towInfo.Latitude) && !double.IsNaN(towInfo.Longitude) && !double.IsNaN(towInfo.Heading) && !double.IsNaN(towInfo.Bank) && !double.IsNaN(towInfo.VelocityBodyZ))
+                                {
+                                    Console.WriteLine("Leveling AI tow plane #" + e.ObjectID);
+                                    try
+                                    {
+                                        _fsConnect.UpdateData(Definitions.TowPlane, towInfo, e.ObjectID);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        addLogMessage(ex.Message);
+                                    }
+                                }
+                            }
+                            // LEVEL UP TAXIING AI TOW PLANE
+                            else if (Math.Abs(response.Bank) > 1 * Math.PI / 180 && response.SimOnGround == 100)
+                            {
+                                TowInfoPitch towCommit = new TowInfoPitch();
+                                towCommit.Bank = response.Bank - Math.Sign(response.Bank) * lastFrameTiming / 50;
+                                towCommit.Heading = response.Heading;
+                                towCommit.VelocityBodyY = response.Verticalspeed * Math.Cos(response.Bank);
+
+                                if (!double.IsNaN(towCommit.Bank))
+                                {
+                                    try
+                                    {
+                                        _fsConnect.UpdateData(Definitions.TowPlaneCommit, towCommit, e.ObjectID);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        addLogMessage(ex.Message);
+                                    }
+                                }
+                            }
+                            // CONTROL ALTITUDE of AI TOW PLANE
+                            else if (insertedTowPlane.Key == e.ObjectID && towingTarget == e.ObjectID &&
+                                (assistantSettings["realisticTowProcedures"] == 0 || response.Airspeed > assistantSettings["aiSpeed"] / 1.96))
+                            {
+                                TowInfoPitch towCommit = new TowInfoPitch();
+                                towCommit.Bank = response.Bank;
+                                towCommit.Heading = response.Heading;
+
+                                if (assistantSettings["realisticTowProcedures"] == 0)
+                                {
+                                    double liftPower = 2 * Math.Pow(Math.Min(assistantSettings["aiSpeed"] / 1.96, response.Airspeed) / assistantSettings["aiSpeed"] / 1.96, 0.5) * lastFrameTiming;
+
+                                    // CONTROL DUMB AIRSPEED
+                                    towCommit.VelocityBodyZ = response.Airspeed + 5 * lastFrameTiming;
+
+                                    // LIMIT ALTITUDE
+                                    if (response.Altitude > towToggledAltitude + 2500 && _planeInfoResponse.AltitudeAboveGround > 100)
+                                    {
+                                        Console.WriteLine("AI Alt limit");
+                                        towCommit.VelocityBodyY = -0.1;
+                                    }
+                                    // LIMIT SINK RATE
+                                    else if (response.Verticalspeed < -0.1)
+                                    {
+                                        Console.WriteLine("AI Sink limit");
+                                        towCommit.VelocityBodyY = liftPower;
+                                    }
+                                    // ADD VERICAL SPEED
+                                    else if (response.Altitude < towToggledAltitude + 2000 && response.Airspeed > 5)
+                                    {
+                                        Console.WriteLine("AI Lift up");
+                                        towCommit.VelocityBodyY = Math.Min(10, response.Verticalspeed + liftPower);
+                                    }
+                                }
+
+                                // LIMIT AIRSPEED
+                                if (response.Airspeed > assistantSettings["aiSpeed"] / 1.96)
+                                {
+                                    towCommit.VelocityBodyZ = 0.9 * assistantSettings["aiSpeed"] / 1.96 + 0.1 * response.Airspeed;
+                                }
+
+                                if (!double.IsNaN(towCommit.Heading) && !double.IsNaN(towCommit.Pitch) && !double.IsNaN(towCommit.Bank) && !double.IsNaN(towCommit.VelocityBodyY) &&
+                                    !double.IsNaN(towCommit.VelocityBodyZ))
+                                {
+                                    try
+                                    {
+                                        _fsConnect.UpdateData(Definitions.TowPlaneCommit, towCommit, e.ObjectID);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        addLogMessage(ex.Message);
+                                    }
+                                }
                             }
                         }
                     }
-
-                    _planeInfoResponseLast = _planeInfoResponse;
-                }
-                // LAUNCH DATA
-                else if (e.RequestId == (uint)Requests.PlaneCommit)
-                {
-                    //Console.WriteLine(JsonConvert.SerializeObject(e.Data, Formatting.Indented));
-                    _planeCommit = (PlaneInfoCommit)e.Data;
-
-                    absoluteTime = _planeCommit.AbsoluteTime;
-
-                    if (_planeCommit.VelocityBodyX != _planeCommitLast.VelocityBodyX || _planeCommit.VelocityBodyY != _planeCommitLast.VelocityBodyY || _planeCommit.VelocityBodyZ != _planeCommitLast.VelocityBodyZ)
+                    // ENGINE DATA
+                    else if (e.RequestId == (uint)Requests.PlaneEngineData)
                     {
-                        lastFrameTiming = absoluteTime - swLast;
+                        //Console.WriteLine(e.ObjectID);
+                        //Console.WriteLine(JsonConvert.SerializeObject(e.Data, Formatting.Indented));
+                        _planeEngineData = (PlaneEngineData)e.Data;
                     }
+
+                    // WEATHER DATA
+                    else if (e.RequestId == (uint)Requests.WeatherData)
+                    {
+                        //Console.WriteLine(e.ObjectID);
+                        //Console.WriteLine(JsonConvert.SerializeObject(e.Data, Formatting.Indented));
+                        _weatherReport = (WeatherReport)e.Data;
+
+                        // WIND
+                        if (_weatherReport.AmbientWindDirection - windDirection > Math.PI)
+                        {
+                            _weatherReport.AmbientWindDirection -= 2 * Math.PI;
+                        }
+                        else if (_weatherReport.AmbientWindDirection - windDirection < -Math.PI)
+                        {
+                            _weatherReport.AmbientWindDirection += 2 * Math.PI;
+                        }
+
+                        windDirection = 0.9 * (windDirection + 2 * Math.PI) + 0.1 * (_weatherReport.AmbientWindDirection + 2 * Math.PI);
+                        windVelocity = 0.9 * windVelocity + 0.1 * _weatherReport.AmbientWindVelocity;
+
+                        while (windDirection > Math.PI) { windDirection -= 2 * Math.PI; }
+                        while (windDirection < -Math.PI) { windDirection += 2 * Math.PI; }
+
+                        // WEATHER
+                        switch (_weatherReport.AmbientPrecipState)
+                        {
+                            case 4: // RAIN
+                                overcastModifier = 0.9 * overcastModifier;
+                                break;
+                            case 8: // SNOW
+                                overcastModifier = 0.9 * overcastModifier + 0.02;
+                                break;
+                            case 2: // DRY
+                            default:
+                                overcastModifier = 0.9 * overcastModifier + 0.1;
+                                break;
+                        }
+
+                        // DAYTIME
+                        switch (_weatherReport.TimeOfDay)
+                        {
+                            case 0: // DAWN
+                                dayTimeModifier = 0.9 * dayTimeModifier + 0.01;
+                                break;
+                            case 1: // DAY
+                                dayTimeModifier = 0.9 * dayTimeModifier + 0.1;
+                                break;
+                            case 2: // DUSK
+                            case 3: // NIGHT
+                                dayTimeModifier = 0.9 * dayTimeModifier;
+                                break;
+                        }
+                    }
+
+
                     else
                     {
-                        lastFrameTiming = 0;
+                        Console.WriteLine("Unknown request ID " + (uint)Requests.PlaneInfo + " received (type " + e.Data.GetType() + ")");
                     }
-
-                    if (lastFrameTiming > 0.0 && lastFrameTiming <= 1.0 && _planeInfoResponse.IsSlewActive != 100)
-                    {
-                        // CHECK WINCH LAUNCH STANDBY
-                        if (_planeInfoResponse.BrakeParkingPosition == 0 && _winchPosition != null && launchTime == 0)
-                        {
-                            initiateLaunch(new object(), new RoutedEventArgs());
-                        }
-                        // APPLY PHYSICS IS LAUNCH ACTIVE
-                        if (lastFrameTiming != 0 && _winchPosition != null)
-                        {
-                            processLaunch();
-                        }
-                        // ARRESTING PHYSICS
-                        if (_carrierPosition != null)
-                        {
-                            processLanding();
-                        }
-                        // LAUNCHPAD PHYSICS
-                        if (targedCatapultVelocity != 0)
-                        {
-                            processLaunchpad();
-                        }
-                        // THERMALS PHYSICS
-                        if (thermalsWorking)
-                        {
-                            Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Children.Clear());
-
-                            if (_planeInfoResponse.AirspeedIndicated < 100)
-                            {
-                                processThermals(thermalsList);
-                                processThermals(thermalsListAPI, true);
-                            }
-                        }
-                    }
-
-                    swLast = absoluteTime;
-
-                    _planeCommitLast = _planeCommit;
                 }
-                // ROTATION DATA
-                else if (e.RequestId == (uint)Requests.PlaneRotate)
+                catch (Exception ex)
                 {
-                    //Console.WriteLine(JsonConvert.SerializeObject(e.Data, Formatting.Indented));
-                    _planeRotate = (PlaneInfoRotate)e.Data;
+                    addLogMessage("Could not handle received FS data: " + ex.Message);
                 }
-                // NEARBY DATA
-                else if (e.RequestId == (uint)Requests.NearbyObjects)
-                {
-                    //Console.WriteLine(e.ObjectID);
-                    //Console.WriteLine(JsonConvert.SerializeObject(e.Data, Formatting.Indented));
-                    NearbyInfoResponse response = (NearbyInfoResponse)e.Data;
-
-                    if (_nearbyInfoResponseLast.ContainsKey(e.ObjectID)) { _nearbyInfoResponsePreLast[e.ObjectID] = _nearbyInfoResponseLast[e.ObjectID]; }
-                    if (_nearbyInfoResponse.ContainsKey(e.ObjectID)) { _nearbyInfoResponseLast[e.ObjectID] = _nearbyInfoResponse[e.ObjectID]; }
-                    _nearbyInfoResponse[e.ObjectID] = new winchPosition(new GeoLocation(response.Latitude, response.Longitude), response.Altitude, 0, response.Airspeed, response.FlightNumber == "9999" || insertedTowPlane.Key == e.ObjectID ? "Tow Plane" : response.Title, response.Category);
-
-                    // TOWING IN PROCESS
-                    if (towingTarget == e.ObjectID)
-                    {
-                        processTowing();
-                    }
-
-                    if (response.FlightNumber == "9999" || insertedTowPlane.Key == e.ObjectID)
-                    {
-                        bool AIhold = assistantSettings["realisticTowProcedures"] == 0 && insertTowPlanePressed != 0 && _planeInfoResponse.AbsoluteTime - insertTowPlanePressed < AIholdInterval;
-                        // HOLD INSERTED PLANE FOR A WHILE
-                        if (AIhold)
-                        {
-                            Console.WriteLine("Holding AI tow plane #" + e.ObjectID);
-                            TowInfoResponse towInfo = new TowInfoResponse();
-                            towInfo.Altitude = response.Altitude;
-                            towInfo.Latitude = response.Latitude;
-                            towInfo.Longitude = response.Longitude;
-                            towInfo.Heading = response.Heading;
-                            towInfo.Bank = 0;
-                            towInfo.VelocityBodyX = 0;
-                            towInfo.VelocityBodyY = 0;
-                            towInfo.VelocityBodyZ = 0;
-
-                            if (!double.IsNaN(towInfo.Altitude) && !double.IsNaN(towInfo.Latitude) && !double.IsNaN(towInfo.Longitude) && !double.IsNaN(towInfo.Heading) && !double.IsNaN(towInfo.Bank) && !double.IsNaN(towInfo.VelocityBodyZ))
-                            {
-                                Console.WriteLine("Leveling AI tow plane #" + e.ObjectID);
-                                try
-                                {
-                                    _fsConnect.UpdateData(Definitions.TowPlane, towInfo, e.ObjectID);
-                                }
-                                catch (Exception ex)
-                                {
-                                    Console.WriteLine(ex.Message);
-                                }
-                            }
-                        }
-                        // LEVEL UP TAXIING AI TOW PLANE
-                        else if (Math.Abs(response.Bank) > 1 * Math.PI / 180 && response.SimOnGround == 100)
-                        {
-                            TowInfoPitch towCommit = new TowInfoPitch();
-                            towCommit.Bank = response.Bank - Math.Sign(response.Bank) * lastFrameTiming / 50;
-                            towCommit.VelocityBodyY = response.Verticalspeed * Math.Cos(response.Bank);
-
-                            if (!double.IsNaN(towCommit.Bank))
-                            {
-                                try
-                                {
-                                    _fsConnect.UpdateData(Definitions.TowPlaneCommit, towCommit, e.ObjectID);
-                                }
-                                catch (Exception ex)
-                                {
-                                    Console.WriteLine(ex.Message);
-                                }
-                            }
-                        }
-                        // CONTROL ALTITUDE of AI TOW PLANE
-                        else if (insertedTowPlane.Key == e.ObjectID && towingTarget == e.ObjectID && response.SimOnGround != 100 && _planeInfoResponse.SimOnGround != 100 && response.Airspeed > 5)
-                        {
-                            TowInfoPitch towCommit = new TowInfoPitch();
-                            towCommit.Bank = response.Bank;
-                            double liftPower = Math.Pow(Math.Min(50, response.Airspeed) / 50, 0.5) * lastFrameTiming;
-
-                            // LIMIT ALTITUDE
-                            if (response.Altitude > towToggledAltitude + 2500 && _planeInfoResponse.AltitudeAboveGround > 100)
-                            {
-                                Console.WriteLine("AI Alt limit");
-                                towCommit.VelocityBodyY = -0.1;
-                            }
-                            // LIMIT SINK RATE
-                            else if (assistantSettings["realisticTowProcedures"] == 0 && response.Verticalspeed < -0.1)
-                            {
-                                Console.WriteLine("AI Sink limit");
-                                towCommit.VelocityBodyY = liftPower;
-                            }
-                            // ADD VERICAL SPEED
-                            else if (response.Altitude < towToggledAltitude + 2000)
-                            {
-                                Console.WriteLine("AI Lift up");
-                                towCommit.VelocityBodyY = Math.Min(10, response.Verticalspeed + liftPower);
-                            }
-
-                            if (!double.IsNaN(towCommit.Bank) && !double.IsNaN(towCommit.VelocityBodyY) && towCommit.VelocityBodyY != 0)
-                            {
-                                try
-                                {
-                                    _fsConnect.UpdateData(Definitions.TowPlaneCommit, towCommit, e.ObjectID);
-                                }
-                                catch (Exception ex)
-                                {
-                                    Console.WriteLine(ex.Message);
-                                }
-                            }
-                        }
-                    }
-                }
-                // ENGINE DATA
-                else if (e.RequestId == (uint)Requests.PlaneEngineData)
-                {
-                    //Console.WriteLine(e.ObjectID);
-                    //Console.WriteLine(JsonConvert.SerializeObject(e.Data, Formatting.Indented));
-                    _planeEngineData = (PlaneEngineData)e.Data;
-                }
-
-                // WEATHER DATA
-                else if (e.RequestId == (uint)Requests.WeatherData)
-                {
-                    //Console.WriteLine(e.ObjectID);
-                    //Console.WriteLine(JsonConvert.SerializeObject(e.Data, Formatting.Indented));
-                    _weatherReport = (WeatherReport)e.Data;
-
-                    // WIND
-                    if (_weatherReport.AmbientWindDirection - windDirection > Math.PI)
-                    {
-                        _weatherReport.AmbientWindDirection -= 2 * Math.PI;
-                    }
-                    else if (_weatherReport.AmbientWindDirection - windDirection < - Math.PI)
-                    {
-                        _weatherReport.AmbientWindDirection += 2 * Math.PI;
-                    }
-
-                    windDirection = 0.9 * (windDirection + 2 * Math.PI) + 0.1 * (_weatherReport.AmbientWindDirection + 2 * Math.PI);
-                    windVelocity = 0.9 * windVelocity  + 0.1 * _weatherReport.AmbientWindVelocity;
-
-                    while (windDirection > Math.PI) { windDirection -= 2 * Math.PI; }
-                    while (windDirection < -Math.PI) { windDirection += 2 * Math.PI; }
-
-                    // WEATHER
-                    switch (_weatherReport.AmbientPrecipState)
-                    {
-                        case 4: // RAIN
-                            overcastModifier = 0.9 * overcastModifier;
-                            break;
-                        case 8: // SNOW
-                            overcastModifier = 0.9 * overcastModifier + 0.02;
-                            break;
-                        case 2: // DRY
-                        default:
-                            overcastModifier = 0.9 * overcastModifier + 0.1;
-                            break;
-                    }
-
-                    // DAYTIME
-                    switch (_weatherReport.TimeOfDay)
-                    {
-                        case 0: // DAWN
-                            dayTimeModifier = 0.9 * dayTimeModifier + 0.01;
-                            break;
-                        case 1: // DAY
-                            dayTimeModifier = 0.9 * dayTimeModifier + 0.1;
-                            break;
-                        case 2: // DUSK
-                        case 3: // NIGHT
-                            dayTimeModifier = 0.9 * dayTimeModifier;
-                            break;
-                    }
-                }
-                
-
-                else
-                {
-                    Console.WriteLine("Unknown request ID " + (uint)Requests.PlaneInfo + " received (type " + e.Data.GetType() + ")");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Could not handle received FS data: " + ex.Message);
             }
         }
 
         // 23-01-2021 THIS REQUEST IS BROKEN
-        /*public void HandleReceivedAirports(object sender, AirportDataReceivedEventArgs e)
+        /*private void HandleReceivedAirports(object sender, AirportDataReceivedEventArgs e)
         {
             try
             {
@@ -2130,7 +2234,7 @@ namespace MSFS_Kinetic_Assistant
             }
         }*/
 
-        public void HandleReceivedSystemEvent(object sender, ObjectAddremoveEventReceivedEventArgs e)
+        private void HandleReceivedSystemEvent(object sender, ObjectAddremoveEventReceivedEventArgs e)
         {
             try
             {
@@ -2148,6 +2252,7 @@ namespace MSFS_Kinetic_Assistant
                             if (assistantSettings["realisticTowProcedures"] == 0 && towingTarget == TARGETMAX && towScanMode >= TowScanMode.TowSearch)
                             {
                                 Console.WriteLine("Teleporting tow plane");
+                                _fsConnect.AIReleaseControl(insertedTowPlane.Key, Requests.TowPlane);
                                 teleportTowPlane(insertedTowPlane.Key);
                             }
                         }
@@ -2156,12 +2261,12 @@ namespace MSFS_Kinetic_Assistant
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Could not handle received EVENT data: " + ex.Message);
+                addLogMessage("Could not handle received EVENT data: " + ex.Message);
             }
         }
 
 
-        public void trackControlChanges()
+        private void trackControlChanges()
         {
             foreach (var field in typeof(PlaneInfoResponse).GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public))
                 if (field.FieldType == typeof(double) && field.Name.StartsWith("LIGHT") &&
@@ -2184,7 +2289,7 @@ namespace MSFS_Kinetic_Assistant
 
         }
 
-        public void runControlFunction(string fieldName)
+        private void runControlFunction(string fieldName)
         {
             foreach (ComboBox tb in FindLogicalChildren<ComboBox>(window))
             {
@@ -2201,7 +2306,7 @@ namespace MSFS_Kinetic_Assistant
             }
         }
 
-        public void InitializeDataDefinitions(FsConnect fsConnect)
+        private void InitializeDataDefinitions(FsConnect fsConnect)
         {
             Console.WriteLine("InitializeDataDefinitions");
 
@@ -2223,6 +2328,8 @@ namespace MSFS_Kinetic_Assistant
             definition.Add(new SimProperty(FsSimVar.IsSlewActive, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
             definition.Add(new SimProperty(FsSimVar.GpsGroundSpeed, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
             definition.Add(new SimProperty(FsSimVar.AirspeedIndicated, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
+            definition.Add(new SimProperty(FsSimVar.Verticalspeed, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
+            definition.Add(new SimProperty(FsSimVar.AmbientWindY, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
 
             // LIGHT STUFF
             definition.Add(new SimProperty(FsSimVar.LIGHTPANEL, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
@@ -2248,7 +2355,7 @@ namespace MSFS_Kinetic_Assistant
             cDefinition.Add(new SimProperty(FsSimVar.AbsoluteTime, FsUnit.Second, SIMCONNECT_DATATYPE.FLOAT64));
             cDefinition.Add(new SimProperty(FsSimVar.TailhookPosition, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
             cDefinition.Add(new SimProperty(FsSimVar.LaunchbarPosition, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
-            cDefinition.Add(new SimProperty(FsSimVar.WaterRudderHandlePosition, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
+            //cDefinition.Add(new SimProperty(FsSimVar.WaterRudderHandlePosition, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
             cDefinition.Add(new SimProperty(FsSimVar.LIGHTLANDING, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
             cDefinition.Add(new SimProperty(FsSimVar.LIGHTTAXI, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
 
@@ -2291,8 +2398,11 @@ namespace MSFS_Kinetic_Assistant
             fsConnect.RegisterDataDefinition<TowInfoResponse>(Definitions.TowPlane, tDefinition);
 
             List<SimProperty> pDefinition = new List<SimProperty>();
+            pDefinition.Add(new SimProperty(FsSimVar.PlaneHeading, FsUnit.Radians, SIMCONNECT_DATATYPE.FLOAT64));
+            pDefinition.Add(new SimProperty(FsSimVar.PlanePitch, FsUnit.Radians, SIMCONNECT_DATATYPE.FLOAT64));
             pDefinition.Add(new SimProperty(FsSimVar.PlaneBank, FsUnit.Radians, SIMCONNECT_DATATYPE.FLOAT64));
             pDefinition.Add(new SimProperty(FsSimVar.VelocityBodyY, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
+            pDefinition.Add(new SimProperty(FsSimVar.VelocityBodyZ, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
 
             fsConnect.RegisterDataDefinition<TowInfoPitch>(Definitions.TowPlaneCommit, pDefinition);
 
@@ -2309,20 +2419,20 @@ namespace MSFS_Kinetic_Assistant
             fsConnect.RegisterDataDefinition<PlaneEngineData>(Definitions.PlaneEngineData, eDefinition);
 
             List<SimProperty> wDefinition = new List<SimProperty>();
-            wDefinition.Add(new SimProperty(FsSimVar.AmbientAirTemperature, FsUnit.Celsius, SIMCONNECT_DATATYPE.FLOAT64));//+
-            wDefinition.Add(new SimProperty(FsSimVar.AmbientBarometerPressure, FsUnit.Millibars, SIMCONNECT_DATATYPE.FLOAT64));//+
-            wDefinition.Add(new SimProperty(FsSimVar.AmbientDensity, FsUnit.SlugsPerCubiFeet, SIMCONNECT_DATATYPE.FLOAT64));//?
-            wDefinition.Add(new SimProperty(FsSimVar.AmbientInCloud, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64)); //+
+            wDefinition.Add(new SimProperty(FsSimVar.AmbientAirTemperature, FsUnit.Celsius, SIMCONNECT_DATATYPE.FLOAT64));
+            wDefinition.Add(new SimProperty(FsSimVar.AmbientBarometerPressure, FsUnit.Millibars, SIMCONNECT_DATATYPE.FLOAT64));
+            wDefinition.Add(new SimProperty(FsSimVar.AmbientDensity, FsUnit.SlugsPerCubiFeet, SIMCONNECT_DATATYPE.FLOAT64));
+            wDefinition.Add(new SimProperty(FsSimVar.AmbientInCloud, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
             wDefinition.Add(new SimProperty(FsSimVar.AmbientPrecipState, FsUnit.Meter, SIMCONNECT_DATATYPE.FLOAT64));//  2 = None 4 = Rain 8 = Snow
-            wDefinition.Add(new SimProperty(FsSimVar.AmbientPressure, FsUnit.Millibars, SIMCONNECT_DATATYPE.FLOAT64));//+
-            wDefinition.Add(new SimProperty(FsSimVar.AmbientSeaLevelPressure, FsUnit.Millibars, SIMCONNECT_DATATYPE.FLOAT64));//+
-            wDefinition.Add(new SimProperty(FsSimVar.AmbientStandardAtmTemperature, FsUnit.Celsius, SIMCONNECT_DATATYPE.FLOAT64));//?
-            wDefinition.Add(new SimProperty(FsSimVar.AmbientTemperature, FsUnit.Celsius, SIMCONNECT_DATATYPE.FLOAT64));//+
-            wDefinition.Add(new SimProperty(FsSimVar.AmbientVisibility, FsUnit.Meter, SIMCONNECT_DATATYPE.FLOAT64)); //+
-            wDefinition.Add(new SimProperty(FsSimVar.AmbientWindDirection, FsUnit.Radians, SIMCONNECT_DATATYPE.FLOAT64));//+
-            wDefinition.Add(new SimProperty(FsSimVar.AmbientWindVelocity, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));//+
-            wDefinition.Add(new SimProperty(FsSimVar.LocalDayOfYear, FsUnit.Meter, SIMCONNECT_DATATYPE.FLOAT64));//+
-            wDefinition.Add(new SimProperty(FsSimVar.LocalTime, FsUnit.Second, SIMCONNECT_DATATYPE.FLOAT64));//+
+            wDefinition.Add(new SimProperty(FsSimVar.AmbientPressure, FsUnit.Millibars, SIMCONNECT_DATATYPE.FLOAT64));
+            wDefinition.Add(new SimProperty(FsSimVar.AmbientSeaLevelPressure, FsUnit.Millibars, SIMCONNECT_DATATYPE.FLOAT64));
+            wDefinition.Add(new SimProperty(FsSimVar.AmbientStandardAtmTemperature, FsUnit.Celsius, SIMCONNECT_DATATYPE.FLOAT64));
+            wDefinition.Add(new SimProperty(FsSimVar.AmbientTemperature, FsUnit.Celsius, SIMCONNECT_DATATYPE.FLOAT64));
+            wDefinition.Add(new SimProperty(FsSimVar.AmbientVisibility, FsUnit.Meter, SIMCONNECT_DATATYPE.FLOAT64));
+            wDefinition.Add(new SimProperty(FsSimVar.AmbientWindDirection, FsUnit.Radians, SIMCONNECT_DATATYPE.FLOAT64));
+            wDefinition.Add(new SimProperty(FsSimVar.AmbientWindVelocity, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
+            wDefinition.Add(new SimProperty(FsSimVar.LocalDayOfYear, FsUnit.Meter, SIMCONNECT_DATATYPE.FLOAT64));
+            wDefinition.Add(new SimProperty(FsSimVar.LocalTime, FsUnit.Second, SIMCONNECT_DATATYPE.FLOAT64));
             wDefinition.Add(new SimProperty(FsSimVar.TimeOfDay, FsUnit.Meter, SIMCONNECT_DATATYPE.FLOAT64));// 0 = Dawn      1 = Day     2 = Dusk    3 = Night
 
 
@@ -2330,7 +2440,7 @@ namespace MSFS_Kinetic_Assistant
             fsConnect.RegisterDataDefinition<WeatherReport>(Definitions.WeatherData, wDefinition);
         }
 
-        public void changeButtonStatus(bool active, Button btn, bool? enabled = null, string text = "")
+        private void changeButtonStatus(bool active, Button btn, bool? enabled = null, string text = "")
         {
             if (active)
             {
@@ -2350,7 +2460,7 @@ namespace MSFS_Kinetic_Assistant
                 btn.IsEnabled = enabled == true;
         }
 
-        public static IEnumerable<T> FindLogicalChildren<T>(DependencyObject depObj) where T : DependencyObject
+        private static IEnumerable<T> FindLogicalChildren<T>(DependencyObject depObj) where T : DependencyObject
         {
             if (depObj != null)
             {
@@ -2374,7 +2484,7 @@ namespace MSFS_Kinetic_Assistant
         }
 
         // SETTINGS STUFF
-        public void processSettings(bool write = true)
+        private void processSettings(bool write = true)
         {
             foreach (ComboBox tb in FindLogicalChildren<ComboBox>(Application.Current.MainWindow))
             {
@@ -2382,11 +2492,19 @@ namespace MSFS_Kinetic_Assistant
                 {
                     if (write && assistantSettings.ContainsKey(tb.Name))
                     {
-                        Console.WriteLine(tb.Name + " " + assistantSettings[tb.Name].ToString());
-                        if (((ComboBox)window.FindName(tb.Name)).IsEditable == true)
-                            ((ComboBox)window.FindName(tb.Name)).Text = assistantSettings[tb.Name].ToString();
+                        ComboBox cb = (ComboBox)window.FindName(tb.Name);
+
+                        if (cb.IsEditable == true)
+                            cb.Text = assistantSettings[tb.Name].ToString();
+                        else if (cb.Items.Count > (int)assistantSettings[tb.Name])
+                        {
+                            cb.SelectedIndex = (int)assistantSettings[tb.Name];
+                            Console.WriteLine(tb.Name + " " + assistantSettings[tb.Name].ToString() + "(" + cb.Items.Count + ")");
+                        }
                         else
-                            ((ComboBox)window.FindName(tb.Name)).SelectedIndex = (int)assistantSettings[tb.Name];
+                        {
+                            assistantSettings[tb.Name] = 0;
+                        }
                     }
                     else if (!write)
                     {
@@ -2425,6 +2543,11 @@ namespace MSFS_Kinetic_Assistant
                 {
                     if (write && assistantSettings.ContainsKey(tb.Name))
                     {
+                        if (tb.Name == "RadarScale")
+                        {
+                            assistantSettings[tb.Name] = Math.Min(maxRadarScale, assistantSettings[tb.Name]);
+                        }
+
                         ((Slider)window.FindName(tb.Name)).Value = assistantSettings[tb.Name];
                     }
                     else if (!write)
@@ -2460,7 +2583,7 @@ namespace MSFS_Kinetic_Assistant
                 }
         }
 
-        public void loadSettings()
+        private void loadSettings()
         {
             if (File.Exists("assistantSettings.json"))
             {
@@ -2486,7 +2609,7 @@ namespace MSFS_Kinetic_Assistant
 
         }
 
-        public void saveSettings(object sender, RoutedEventArgs e)
+        private void saveSettings(object sender, RoutedEventArgs e)
         {
             try
             {
@@ -2520,16 +2643,33 @@ namespace MSFS_Kinetic_Assistant
                         {
                             toggleSidebarWindow(((CheckBox)sender).IsChecked == true);
                         }
-                        else if (((CheckBox)sender).Name == "nmeaServer")
+                    }
+                    else if (sender != null && sender.GetType() == typeof(ComboBox))
+                    {
+                        if (((ComboBox)sender).Name == "nmeaServer")
                         {
-                            if (((CheckBox)sender).IsChecked == true)
+                            if (((ComboBox)sender).SelectedIndex != 0)
                             {
-                                ServerStart();
+                                ServerStop();
+                                ServerStart(((ComboBoxItem)((ComboBox)sender).SelectedItem).Tag.ToString());
                             }
                             else
                             {
                                 ServerStop();
                             }
+                        }
+                    }
+                    else if (sender != null && sender.GetType() == typeof(Slider))
+                    {
+                        if (((Slider)sender).Name == "RequestsFrequency")
+                        {
+                            launchTimer.Interval = new TimeSpan(0, 0, 0, 0, 1000 / Math.Max(5, (int)assistantSettings["RequestsFrequency"]));
+                            //Console.WriteLine("NEW INTERVAL: " + launchTimer.Interval.ToString());
+                        }
+                        else if (((Slider)sender).Name == "RadarScale")
+                        {
+                            _radarClass.updateRadarCover(RadarCanvas, assistantSettings["RadarScale"] / maxRadarScale );
+                            scaleRefresh = 2;
                         }
                     }
                 }
@@ -2561,7 +2701,7 @@ namespace MSFS_Kinetic_Assistant
         }
 
 
-        public void toggleControlOptions(object sender, RoutedEventArgs e)
+        private void toggleControlOptions(object sender, RoutedEventArgs e)
         {
             foreach (var element in ((StackPanel)((Button)sender).Parent).Children)
             {
@@ -2574,7 +2714,7 @@ namespace MSFS_Kinetic_Assistant
                     ((Button)element).Visibility = ((Button)element).Visibility == Visibility.Collapsed ? Visibility.Visible : Visibility.Collapsed;
             }
         }
-        public void showMessage(string text, FsConnect _fsConnect)
+        private void showMessage(string text, FsConnect _fsConnect)
         {
             if (assistantSettings["displayTips"] == 1)
             {
@@ -2589,15 +2729,19 @@ namespace MSFS_Kinetic_Assistant
             Console.WriteLine(text);
         }
 
-        public void addLogMessage(string text)
+        private void addLogMessage(string text, int clr = 0)
         {
             if (System.Windows.Application.Current != null)
             {
-                Application.Current.Dispatcher.Invoke(() => messagesLog.Children.Insert(0, makeTextBlock(DateTime.UtcNow.ToString("u") + ": " + text, Colors.Black, 10, TextWrapping.Wrap)));
+                Color color = Colors.Black;
+                if (clr == 1) { color = Colors.DarkOrange; }
+                else if (clr == 2) { color = Colors.DarkRed; }
+
+                Application.Current.Dispatcher.Invoke(() => messagesLog.Children.Insert(0, makeTextBlock(DateTime.UtcNow.ToString("u") + ": " + text, color, 10, TextWrapping.Wrap)));
             }
         }
 
-        public void playSound(string soundName)
+        private void playSound(string soundName)
         {
             if (assistantSettings["playSounds"] == 1)
             {
@@ -2613,7 +2757,7 @@ namespace MSFS_Kinetic_Assistant
             }
         }
 
-        public TextBlock makeTextBlock(string text, Color color, int size = 0, TextWrapping wrap = TextWrapping.NoWrap)
+        private TextBlock makeTextBlock(string text, Color color, int size = 0, TextWrapping wrap = TextWrapping.NoWrap)
         {
             TextBlock textblock = new TextBlock();
             textblock.Text = text;
@@ -2628,62 +2772,85 @@ namespace MSFS_Kinetic_Assistant
 
         // UI
 
-        public void Window_MouseDown(object sender, MouseButtonEventArgs e)
+        private void Window_MouseDown(object sender, MouseButtonEventArgs e)
         {
             if (e.ChangedButton == MouseButton.Left)
                 this.DragMove();
         }
 
-        public void OnTopIconClick(object sender, EventArgs e)
+        private void OnTopIconClick(object sender, EventArgs e)
         {
             alwaysOnTop.IsChecked = !alwaysOnTop.IsChecked;
             saveSettings(alwaysOnTop, null);
         }
-        public void TransparentIconClick(object sender, EventArgs e)
+        private void TransparentIconClick(object sender, EventArgs e)
         {
             transparentBackground.IsChecked = !transparentBackground.IsChecked;
             saveSettings(transparentBackground, null);
         }
-        public void toggleHotspotsAutoload(object sender, RoutedEventArgs e)
+        private void toggleHotspotsAutoload(object sender, RoutedEventArgs e)
         {
             KK7Autoload.IsChecked = !KK7Autoload.IsChecked;
             saveSettings(KK7Autoload, null);
         }
 
-        public void toggleOpenAipAutoload(object sender, RoutedEventArgs e)
+        private void toggleOpenAipAutoload(object sender, RoutedEventArgs e)
         {
             OpenAipAutoload.IsChecked = !OpenAipAutoload.IsChecked;
             saveSettings(OpenAipAutoload, null);
         }
 
-        public void toggleSidebar(object sender, RoutedEventArgs e)
+        private void toggleSidebar(object sender, RoutedEventArgs e)
         {
             sidebarActive.IsChecked = !sidebarActive.IsChecked;
             saveSettings(sidebarActive, null);
         }
-
-        public void toggleSidebarWindow(bool? state = null)
+        private void toggleMainbar(object sender, RoutedEventArgs e)
         {
-            if (state == true || state == null && toggleSidebarButton.Text == ">") {
+            toggleMainbarWindow(thermalsDebugActive == 2);
+        }
+
+
+        private void toggleSidebarWindow(bool? state = null)
+        {
+            if (state == true || state == null && toggleSidebarButton.Text == ">")
+            {
                 toggleSidebarButton.Text = "<";
-                thermalsDebugActive = true;
+                thermalsDebugActive = 1;
                 SidebarColumn.Width = GridLength.Auto;
                 window.Width = 550;
             }
             else
             {
                 toggleSidebarButton.Text = ">";
-                thermalsDebugActive = false;
+                thermalsDebugActive = 0;
                 SidebarColumn.Width = new GridLength(0);
                 window.Width = 275;
             }
         }
+        private void toggleMainbarWindow(bool state)
+        {
+            if (state)
+            {
+                toggleMainButton.Text = ">";
+                thermalsDebugActive = 1;
+                MaincontentColumn.Width = GridLength.Auto;
+                window.Width = 550;
+            }
+            else
+            {
+                toggleMainButton.Text = "<";
+                thermalsDebugActive = 2;
+                MaincontentColumn.Width = new GridLength(0);
+                window.Width = 275;
+            }
+        }
 
-        public void MinimizeIconClick(object sender, EventArgs e)
+        private void MinimizeIconClick(object sender, EventArgs e)
         {
             WindowState = WindowState.Minimized;
         }
-        public void closeIconClick(object sender, EventArgs e)
+        private void closeIconClick(object sender, EventArgs e)
         {
 
             if (validConnection())
@@ -2700,7 +2867,7 @@ namespace MSFS_Kinetic_Assistant
             }
         }
 
-        public Image getIconImage(bool state, string names)
+        private Image getIconImage(bool state, string names)
         {
             Image img = new Image();
             img.Source = new BitmapImage(new Uri(names.Split('|')[state ? 1 : 0], UriKind.Relative));
@@ -2728,12 +2895,12 @@ namespace MSFS_Kinetic_Assistant
             saveSettings(newLastRead, null);
             setNewsLabel("0");
         }
-        public void triggerCheckUpdate(object sender, EventArgs e)
+        private void triggerCheckUpdate(object sender, EventArgs e)
         {
             _ = CheckUpdateAsync();
         }
 
-        public async Task CheckUpdateAsync()
+        private async Task CheckUpdateAsync()
         {
             //string pubVer = Assembly.GetExecutingAssembly().GetName().Version.ToString();
 
@@ -2758,14 +2925,35 @@ namespace MSFS_Kinetic_Assistant
         // UPDATES END
 
         // TCP SERVER START
-        private void ServerStart()
+        private void addServerIPs()
+        {
+            String strHostName = Dns.GetHostName();
+            IPHostEntry iphostentry = Dns.GetHostByName(strHostName);
+            foreach (IPAddress ipaddress in iphostentry.AddressList)
+            {
+                ComboBoxItem option = new ComboBoxItem();
+                option.Tag = ipaddress.ToString();
+                option.Content = "XCSoar server: " + option.Tag;
+                nmeaServer.Items.Add(option);
+            }
+        }
+
+        private void ServerStart(string ip = "127.0.0.1")
         {
             addLogMessage("NMEA Server: START");
             if (threadServer == null)
             {
-                server = new Server(true, new CallbackUI(ServerStatus));
-                threadServer = new Thread(new ThreadStart(server.Start));
-                threadServer.Start();
+                try
+                {
+                    server = new Server(true, new CallbackUI(ServerStatus), ip);
+                    threadServer = new Thread(new ThreadStart(server.Start));
+                    threadServer.Start();
+                }
+                catch (Exception ex)
+                {
+                    addLogMessage("Can't start NMEA server: " + ex.Message);
+                }
+
                 while (!threadServer.IsAlive) ;
             }
         }
@@ -2775,9 +2963,16 @@ namespace MSFS_Kinetic_Assistant
             addLogMessage("NMEA Server: STOP");
             if (threadServer != null)
             {
-                server.Stop();
-                threadServer.Join(1000);
-                threadServer = null;
+                try
+                {
+                    server.Stop();
+                    threadServer.Join(1000);
+                    threadServer = null;
+                }
+                catch (Exception ex)
+                {
+                    addLogMessage("Can't stop NMEA server: " + ex.Message);
+                }
             }
         }
         private void ServerStatus(ServerStatus status)

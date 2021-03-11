@@ -138,6 +138,8 @@
       <DependentUpon>App.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="RadarClass.cs" />
+    <Compile Include="Server.cs" />
     <Compile Include="SimvarsViewModel.cs" />
     <Compile Include="simVars.cs" />
     <Compile Include="MathClass.cs" />
@@ -208,6 +210,8 @@
     <Resource Include="ctrl2.png" />
   </ItemGroup>
   <ItemGroup>
+    <Resource Include="winchIcon.png" />
+    <Resource Include="wp.png" />
     <Resource Include="close.png" />
     <Resource Include="csv.png" />
     <Content Include="error.wav" />
@@ -219,6 +223,8 @@
     <Resource Include="unpinned.png" />
     <Resource Include="tow.bmp" />
     <Resource Include="map.png" />
+    <Resource Include="RadarCover.png" />
+    <Resource Include="gliderIcon.png" />
     <Content Include="true.wav" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

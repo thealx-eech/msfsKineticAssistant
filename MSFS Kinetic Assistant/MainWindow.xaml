@@ -12,8 +12,8 @@
         BorderThickness="0"
         AllowsTransparency="True" WindowStyle="None"
         x:Name="window">
-    
-    
+
+
     <!-- HEADER START -->
     <Window.Background>
         <SolidColorBrush Opacity="1" Color="White" x:Name="WindowBackground" />
@@ -53,15 +53,88 @@
                 <scm:SortDescription />
             </CollectionViewSource.SortDescriptions>
         </CollectionViewSource>
+
+        <Style x:Key="SliderRepeatButton" TargetType="RepeatButton">
+            <Setter Property="SnapsToDevicePixels" Value="true" />
+            <Setter Property="OverridesDefaultStyle" Value="true" />
+            <Setter Property="IsTabStop" Value="false" />
+            <Setter Property="Focusable" Value="false" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RepeatButton">
+                        <Border Background="#55000000" Height="3"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SliderRepeatButton1" TargetType="RepeatButton">
+            <Setter Property="SnapsToDevicePixels" Value="true" />
+            <Setter Property="OverridesDefaultStyle" Value="true" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RepeatButton">
+                        <Border SnapsToDevicePixels="True" Background="#55004400" Height="3"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SliderThumb" TargetType="Thumb">
+            <Setter Property="SnapsToDevicePixels" Value="true" />
+            <Setter Property="OverridesDefaultStyle" Value="true" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Ellipse Height="10" Width="10" Fill="#55004400"></Ellipse>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <ControlTemplate x:Key="Slider"  TargetType="Slider">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" MinHeight="{TemplateBinding MinHeight}" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Track Grid.Row="1" x:Name="PART_Track"   >
+                    <Track.DecreaseRepeatButton>
+                        <RepeatButton Style="{StaticResource SliderRepeatButton1}"  Command="Slider.DecreaseLarge" />
+                    </Track.DecreaseRepeatButton>
+                    <Track.Thumb>
+                        <Thumb Style="{StaticResource SliderThumb}"  />
+                    </Track.Thumb>
+                    <Track.IncreaseRepeatButton>
+                        <RepeatButton Style="{StaticResource SliderRepeatButton}" Command="Slider.IncreaseLarge" />
+                    </Track.IncreaseRepeatButton>
+                </Track>
+            </Grid>
+        </ControlTemplate>
+
+        <Style x:Key="Horizontal_Slider" TargetType="Slider">
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="SnapsToDevicePixels" Value="true" />
+            <Setter Property="OverridesDefaultStyle" Value="true" />
+            <Style.Triggers>
+                <Trigger Property="Orientation" Value="Horizontal">
+                    <Setter Property="MinHeight" Value="21" />
+                    <Setter Property="MinWidth" Value="104" />
+                    <Setter Property="Template" Value="{StaticResource Slider}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
     </Window.Resources>
     <!-- HEADER END -->
 
-    
-    
+
+
     <StackPanel VerticalAlignment="Top">
 
 
-        
+
         <!-- TOP BAR START -->
         <StackPanel Margin="0">
             <StackPanel.Background>
@@ -108,26 +181,53 @@
                 <ColumnDefinition Name="SidebarColumn" Width="0"></ColumnDefinition>
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="1" HorizontalAlignment="Left" Width="275">
-                    <ScrollViewer Name="towPlaneScanList" VerticalScrollBarVisibility="Visible" Height="200">
-                        <StackPanel>
-                        <StackPanel Name="currentTarget" VerticalAlignment="Top">
-                        </StackPanel>
-                        <StackPanel Name="nearbyObjects" VerticalAlignment="Top">
-                        </StackPanel>
-                        <StackPanel Name="farObjects" VerticalAlignment="Top">
-                        </StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="10"></ColumnDefinition>
+                        <ColumnDefinition Width="7*"></ColumnDefinition>
+                        <ColumnDefinition Width="43*"/>
+                        <ColumnDefinition Width="15"></ColumnDefinition>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="125"></RowDefinition>
+                                <RowDefinition Height="125"></RowDefinition>
+                            </Grid.RowDefinitions>
+                            <Canvas Grid.Row="0" Name="VerticalWindPos" Width="10" VerticalAlignment="Bottom" Height="0" Background="#20FF0000"></Canvas>
+                            <Canvas Grid.Row="1" Name="VerticalWindNeg" Width="10" VerticalAlignment="Top" Height="0" Background="#200000FF"></Canvas>
+                        </Grid>
+                    </StackPanel>
+                    <Canvas Name="RadarCanvas" Grid.Column="1" ClipToBounds="True"  Height="250" Grid.ColumnSpan="2">
+
+                    </Canvas>
+                    <StackPanel Grid.Column="3">
+                        <Slider Margin="-5 0 0 0" TickPlacement="TopLeft" AutoToolTipPlacement="TopLeft" AutoToolTipPrecision="1" TickFrequency="1" Minimum="0.1" Value="5" Maximum="1" Name="RadarScale" ValueChanged="saveSettings" Orientation="Vertical" VerticalAlignment="Stretch" Height="250"></Slider>
+                    </StackPanel>
+                </Grid>
+                <StackPanel Height="30">
+                    <StackPanel Name="currentTarget" VerticalAlignment="Top">
+                    </StackPanel>
+                    <StackPanel Name="nearbyObjects" VerticalAlignment="Top">
+                    </StackPanel>
+                    <StackPanel Name="farObjects" VerticalAlignment="Top">
+                    </StackPanel>
+                </StackPanel>
+                <StackPanel Name="thermalsDebugData" VerticalAlignment="Top" Height="0">
+                </StackPanel>
+                <ScrollViewer VerticalScrollBarVisibility="Visible" Height="90">
+                    <StackPanel Name="messagesLog">
+
                     </StackPanel>
                 </ScrollViewer>
-                <StackPanel Name="thermalsDebugData" VerticalAlignment="Top" Height="100">
-                </StackPanel>
-                <ScrollViewer VerticalScrollBarVisibility="Visible" Height="80">
-                        <StackPanel Name="messagesLog">
-                        
-                        </StackPanel>
-                </ScrollViewer>
+
+                <Button Click="toggleMainbar" Cursor="Hand" Width="26" Height="26" Margin="10 -688 0 0" HorizontalAlignment="Left" Background="#55FFFFFF">
+                    <TextBlock FontFamily="Comic Sans MS" FontWeight="Black" FontSize="20" Margin="0 -5 0 0" Name="toggleMainButton" Text="&gt;"/>
+                </Button>
             </StackPanel>
-            <StackPanel Grid.Column="0" HorizontalAlignment="Right">
-                    <StackPanel Margin="10, 10, 46, 10" >
+            <StackPanel Grid.Column="0" HorizontalAlignment="Right" Width="275">
+                <StackPanel Margin="10, 10, 46, 10" >
+                    <Slider Style="{StaticResource Horizontal_Slider}"  Margin="0, -15, 0, -3" ValueChanged="saveSettings" ToolTip="SimConnect requests per second" Name="RequestsFrequency" IsSnapToTickEnabled="True" TickFrequency="1" Minimum="5" Maximum="18" Value="18" AutoToolTipPlacement="TopLeft"  AutoToolTipPrecision="0" ></Slider>
                     <Button x:Name="connectButton" Height="26px" Background="#55FFFFFF" Foreground="DarkGreen" BorderBrush="DarkGreen" Click="toggleConnect" VerticalAlignment="Top">CONNECT</Button>
                 </StackPanel>
                 <TabControl VerticalAlignment="Stretch" Height="326px" TabStripPlacement="Right" Background="Transparent">
@@ -217,7 +317,7 @@
                             </StackPanel>
                         </StackPanel>
                     </TabItem>
-                    <TabItem Header="Aerotow" Height="53" Background="Transparent" Margin="0,0,-2,0" VerticalAlignment="Bottom">
+                    <TabItem Header="Aerotow" Height="53" Background="Transparent">
                         <StackPanel MinWidth="211" Margin="-2 -2 -2 -1" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" ScrollViewer.CanContentScroll="True">
                             <StackPanel.Background>
                                 <ImageBrush ImageSource="tow.bmp" Opacity="0.1"/>
@@ -227,18 +327,17 @@
                                     <ColumnDefinition Width="105" />
                                     <ColumnDefinition Width="105" />
                                 </Grid.ColumnDefinitions>
-                            
+
                                 <StackPanel Margin="5, 5, 5, 0" Grid.Column="0" >
                                     <TextBlock FontSize="10">
-                                        Scan range (meters)
+                                        AI speed (knots)
                                     </TextBlock>
-                                    <ComboBox IsEditable="True" TextBoxBase.TextChanged="saveSettings" Name="towSearchRadius" Height="26" Margin="0 5 0 0">
-                                        <ComboBoxItem>100</ComboBoxItem>
-                                        <ComboBoxItem>200</ComboBoxItem>
-                                        <ComboBoxItem>300</ComboBoxItem>
-                                        <ComboBoxItem IsSelected="True">500</ComboBoxItem>
-                                        <ComboBoxItem>1000</ComboBoxItem>
-                                        <ComboBoxItem>2000</ComboBoxItem>
+                                    <ComboBox IsEditable="True" TextBoxBase.TextChanged="saveSettings" Name="aiSpeed" Height="26" Margin="0 5 0 0">
+                                        <ComboBoxItem>40</ComboBoxItem>
+                                        <ComboBoxItem>50</ComboBoxItem>
+                                        <ComboBoxItem IsSelected="True">60</ComboBoxItem>
+                                        <ComboBoxItem>70</ComboBoxItem>
+                                        <ComboBoxItem>80</ComboBoxItem>
                                     </ComboBox>
                                 </StackPanel>
 
@@ -284,23 +383,23 @@
                                 AI Tow Plane Type
                                 </TextBlock>
                                 <ComboBox IsEditable="True" Name="towPlaneModel" ToolTip="You can type custom aircraft name (full name in Developer menu > Aircraft Selector)" SelectionChanged="saveSettings"  Background="Transparent" Height="26" Margin="0 5 0 0">
-                                    <ComboBoxItem IsSelected="true">Icon A5 Asobo</ComboBoxItem>
-                                    <ComboBoxItem>FlightDesignCT Asobo</ComboBoxItem>
-                                    <ComboBoxItem>Bonanza G36 Asobo</ComboBoxItem>
-                                    <ComboBoxItem>DA62 Asobo</ComboBoxItem>
+                                    <ComboBoxItem IsSelected="true">Asobo Savage Cub</ComboBoxItem>
                                     <ComboBoxItem>Beechcraft King Air 350i Asobo</ComboBoxItem>
-                                    <ComboBoxItem>TBM 930 Asobo</ComboBoxItem>
-                                    <ComboBoxItem>Cessna CJ4 Citation Asobo</ComboBoxItem>
-                                    <ComboBoxItem>--- REALISTIC MODE ONLY ---</ComboBoxItem>
-                                    <ComboBoxItem>Cessna 208B Grand Caravan EX</ComboBoxItem>
+                                    <ComboBoxItem>Bonanza G36 Asobo</ComboBoxItem>
                                     <ComboBoxItem>Cessna 152 Asobo</ComboBoxItem>
-                                    <ComboBoxItem>Cessna Skyhawk G1000 Asobo</ComboBoxItem>
-                                    <ComboBoxItem>Mudry Cap 10 c</ComboBoxItem>
+                                    <ComboBoxItem>Cessna 208B Grand Caravan EX</ComboBoxItem>
+                                    <ComboBoxItem>Cessna CJ4 Citation Asobo</ComboBoxItem>
                                     <ComboBoxItem>DA40-NG Asobo</ComboBoxItem>
+                                    <ComboBoxItem>DA62 Asobo</ComboBoxItem>
                                     <ComboBoxItem>DR400 Asobo</ComboBoxItem>
                                     <ComboBoxItem>Extra 330 Asobo</ComboBoxItem>
+                                    <ComboBoxItem>FlightDesignCT Asobo</ComboBoxItem>
+                                    <ComboBoxItem>Icon A5 Asobo</ComboBoxItem>
+                                    <ComboBoxItem>Mudry Cap 10 c</ComboBoxItem>
                                     <ComboBoxItem>Pitts Asobo</ComboBoxItem>
-                                    <ComboBoxItem>Asobo Savage Cub</ComboBoxItem>
+                                    <ComboBoxItem>TBM 930 Asobo</ComboBoxItem>
+                                    <ComboBoxItem>--- REALISTIC MODE ONLY ---</ComboBoxItem>
+                                    <ComboBoxItem>Cessna Skyhawk G1000 Asobo</ComboBoxItem>
                                 </ComboBox>
                             </StackPanel>
 
@@ -322,7 +421,7 @@
                                 </StackPanel>
 
                                 <StackPanel Margin="0, 10, 5, 0" Grid.Column="1">
-                                    <Button ToolTip="EXPERIMENTAL! Use only in small airport which set as departure in flight plan" IsEnabled="false" Height="26px" x:Name="towInsertButton" Background="#55FFFFFF" Click="aiTowPlane" Foreground="DarkRed" BorderBrush="DarkRed" Margin="0, 0, 0, 0"  VerticalAlignment="Top">AI TOW</Button>
+                                    <Button ToolTip="EXPERIMENTAL! Realistic procedures are not recommended" IsEnabled="false" Height="26px" x:Name="towInsertButton" Background="#55FFFFFF" Click="aiTowPlane" Foreground="DarkRed" BorderBrush="DarkRed" Margin="0, 0, 0, 0"  VerticalAlignment="Top">AI TOW</Button>
                                 </StackPanel>
                             </Grid>
 
@@ -511,13 +610,16 @@
                                 <CheckBox x:Name="realisticTowProcedures" ToolTip="Only for airfield with taxi paths!"  Click="saveSettings" IsChecked="False">Realistic tow plane procedures</CheckBox>
                             </StackPanel>
                             <StackPanel Margin="5, 10, 5, 0">
-                                <CheckBox IsEnabled="false" x:Name="nmeaServer" ToolTip="Set your local IP in the XCSoar, port 10110" Click="saveSettings">XCSoar data export EXPERIMENT.</CheckBox>
+                                <ComboBox FontSize="12" x:Name="nmeaServer" SelectionChanged="saveSettings"  ToolTip="Set selected IP and port 10110 in the XCSoar client" >
+                                    <ComboBoxItem IsSelected="true">XCSoar server: disabled</ComboBoxItem>
+                                    <ComboBoxItem Tag="127.0.0.1">XCSoar server: 127.0.0.1</ComboBoxItem>
+                                </ComboBox>
                             </StackPanel>
                             <StackPanel Margin="5, 10, 5, 0"  >
                                 <CheckBox x:Name="playSounds" Click="saveSettings">Play sounds</CheckBox>
                             </StackPanel>
                             <StackPanel Margin="5, 5, 5, 0"  >
-                                <Slider x:Name="soundsVolume" ValueChanged="saveSettings"  Minimum="0" Maximum="100" Value="50" AutoToolTipPlacement="BottomRight" AutoToolTipPrecision="0"  ></Slider>
+                                <Slider Style="{StaticResource Horizontal_Slider}" x:Name="soundsVolume" ValueChanged="saveSettings"  Minimum="0" Maximum="100" Value="50" AutoToolTipPlacement="BottomRight" AutoToolTipPrecision="0"  ></Slider>
                             </StackPanel>
 
                             <TextBlock TextWrapping="Wrap" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="5, 10, 5, 0">
@@ -539,7 +641,7 @@
                                 </Hyperlink>
                             </TextBlock>
 
-                        
+
 
                             <TextBlock TextWrapping="Wrap" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="5, 10, 5, 0">
                                 Support: msfs@touching.cloud
@@ -555,10 +657,10 @@
         </Grid>
         <!-- KINETIC END -->
 
-        
+
 
     </StackPanel>
-    
-    
-    
+
+
+
 </Window>

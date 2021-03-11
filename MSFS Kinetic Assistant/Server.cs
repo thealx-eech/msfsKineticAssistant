@@ -25,14 +25,15 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Timers;
-using Location_Bridge.Properties;
+using MSFS_Kinetic_Assistant.Properties;
 
-namespace Location_Bridge
+namespace MSFS_Kinetic_Assistant
 {
 
     // Based on http://msdn.microsoft.com/en-us/library/fx6588te.aspx
@@ -60,11 +61,13 @@ namespace Location_Bridge
         private volatile bool cancel = false;
         private Object lockClients = new Object();
         private List<Client> clients = new List<Client>();
+        private IPAddress ipAddress;
 
         public static ManualResetEvent signal = new ManualResetEvent(false);
 
-        public Server(object gpsLock, CallbackUI callback)
+        public Server(object gpsLock, CallbackUI callback, string ip)
         {
+            ipAddress = IPAddress.Parse(ip);
             lockGps = gpsLock;
             this.callback = callback;
             UpdateCount();
@@ -78,13 +81,12 @@ namespace Location_Bridge
         public void Start()
         {
             IPEndPoint localEndPoint;
-            if (Properties.Settings.Default.LocalOnly)
+            /*if (Properties.Settings.Default.LocalOnly)
                 localEndPoint = new IPEndPoint(IPAddress.Loopback, 10110);
-            else
-                localEndPoint = new IPEndPoint(IPAddress.Any, 10110);
+            else*/
+                localEndPoint = new IPEndPoint(ipAddress, 10110);
 
-            var socketServer = new Socket(AddressFamily.InterNetwork,
-                                          SocketType.Stream, ProtocolType.Tcp);
+            var socketServer = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             callback(new ServerStatus(Resources.Waiting));
 
             try
@@ -102,6 +104,7 @@ namespace Location_Bridge
             }
             catch (SocketException e)
             {
+                Console.Write("EXCEPTION: Start error " + e.Message);
                 callback(new ServerStatus(ServerStatusCode.ERROR,
                     String.Format(Resources.Error0, e.SocketErrorCode.ToString())));
                 if (socketServer.IsBound)
@@ -117,7 +120,7 @@ namespace Location_Bridge
 
         private static string GetHostName(string address)
         {
-            string host = address.Split(':')[0];
+            /*string host = address.Split(':')[0];
             string hostName = "";
             try
             {
@@ -125,14 +128,30 @@ namespace Location_Bridge
 
                 hostName = hostEntry.HostName;
             }
-            catch (SocketException)
+            catch (SocketException ex)
             {
+                Console.Write("EXCEPTION: Can't get host name " + ex.Message);
                 hostName = host;
             }
 
-            return "'" + hostName + "'";
+            return "'" + hostName + "'";*/
 
+            try
+            {
+                IPHostEntry entry = Dns.GetHostEntry(address);
+                if (entry != null)
+                {
+                    return entry.HostName;
+                }
+            }
+            catch (SocketException ex)
+            {
+                Console.Write("EXCEPTION: Can't get host name " + ex.Message);
+            }
+
+            return "";
         }
+
 
         private void ClientAdd(Client client)
         {
@@ -178,7 +197,9 @@ namespace Location_Bridge
                         String.Format(Resources._0RefusedTooManyConnections, addr)));
                 }
             }
-            catch (ObjectDisposedException) { }
+            catch (Exception ex) {
+                Console.Write("EXCEPTION: Can't process callback " + ex.Message);
+            }
         }
 
         private void Send(Client client, String data)
@@ -189,8 +210,9 @@ namespace Location_Bridge
                 client.socket.BeginSend(byteData, 0, byteData.Length, 0,
                                         new AsyncCallback(SendCallback), client);
             }
-            catch (SocketException)
+            catch (SocketException ex)
             {
+                Console.Write("EXCEPTION: Send error " + ex.Message);
                 ClientRemove(client);
             }
         }
@@ -202,8 +224,9 @@ namespace Location_Bridge
             {
                 client.socket.EndSend(ar);
             }
-            catch (SocketException)
+            catch (SocketException ex)
             {
+                Console.Write("EXCEPTION: SendCallback error " + ex.Message);
                 ClientRemove(client);
             }
         }
@@ -214,7 +237,10 @@ namespace Location_Bridge
             {
                 return !(socket.Poll(1, SelectMode.SelectRead) && socket.Available == 0);
             }
-            catch (SocketException) { return false; }
+            catch (SocketException ex) {
+                Console.Write("EXCEPTION: IsConnected error " + ex.Message);
+                return false;
+            }
         }
 
         private void OnTimerAlive(object source, ElapsedEventArgs e)
@@ -233,9 +259,7 @@ namespace Location_Bridge
 
         private static string NmeaCoord(double coord, bool isLat)
         {
-
-            var direct = "";
-            var format = "";
+            string direct;
 
             if (isLat)
             {
@@ -243,7 +267,6 @@ namespace Location_Bridge
                     direct = "S";
                 else
                     direct = "N";
-                format = "{0:D2}{1,7:F4},{2}";
             }
             else
             {
@@ -251,14 +274,11 @@ namespace Location_Bridge
                     direct = "W";
                 else
                     direct = "E";
-                format = "{0:D3}{1,7:F4},{2}";
             }
 
-            coord = Math.Abs(coord);
-            var degs = (int)coord;
-            var mins = (coord - degs) * 60.0;
-
-            var nmea = String.Format(format, degs, mins, direct);
+            int deg = (int)Math.Floor(coord);
+            double min = (coord % 1) * 60;
+            var nmea = deg.ToString() + min.ToString("00.0000000", CultureInfo.InvariantCulture) + "," + direct;
             return nmea;
         }
 
@@ -270,7 +290,6 @@ namespace Location_Bridge
                 checksum ^= sentence[i];
 
             return "*" + checksum.ToString("X2");
-
         }
 
         private static string NmeaFormat(Location location)
@@ -278,24 +297,37 @@ namespace Location_Bridge
             var lat = NmeaCoord(location.lat, true);
             var lon = NmeaCoord(location.lon, false);
             var alt = location.alt.ToString("F1");
-            var speed = (location.speed * 1.94384449).ToString("F3");
+            var speed = (location.speed * 1.9).ToString("F3") ;
             var time = location.time.ToString("HHmmss.ff");
-            var date = location.time.ToString("ddMMyy");
+            var date = location.time.ToString("ddmmyy");
+            var ha = location.ha.ToString("0.0");
 
-            var gga = String.Format("GPGGA,{0},{1},{2},1,12,,{3},M,,M,,,",
-                time, lat, lon, alt);
-            var gll = String.Format("GPGLL,{0},{1},{2},V",
-                lat, lon, time);
-            var rmc = String.Format("GPRMC,{0},A,{1},{2},{3},0,{4},0,0,A",
-                time, lat, lon, speed, date);
+            var gga = String.Format("GPGGA,{0},{1},{2},1,12,1,{3},M,,,,", time, lat, lon, alt);
+            var gll = String.Format("GPGLL,{0},{1},{2},A", lat, lon, time);
+            var rmc = String.Format("GPRMC,{0},A,{1},{2},{3},{4},{5},0.0,E,A", time, lat, lon, speed, ha, date);
+            var gsa = "GPGSA,A,3,04,05,06,09,12,20,22,24,25,26,28,30,1,1,1,";
+            var vgt = String.Format("GPVTG,{0},T,{0},M,0,N,0,K", ha);
 
-            gga = "$" + gga + NmeaChecksum(gga);
-            gll = "$" + gll + NmeaChecksum(gll);
-            rmc = "$" + rmc + NmeaChecksum(rmc);
+            gga = "$" + gga + NmeaChecksum(gga) + "\r\n";
+            gll = "$" + gll + NmeaChecksum(gll) + "\r\n";
+            rmc = "$" + rmc + NmeaChecksum(rmc) + "\r\n";
+            gsa = "$" + gsa + NmeaChecksum(gsa) + "\r\n";
+            vgt = "$" + vgt + NmeaChecksum(vgt) + "\r\n";
 
-            return gga + "\n\r"
-                + gll + "\n\r"
-                + rmc + "\n\r";
+            string responce = gga + gll + rmc + gsa + vgt;
+
+            return responce;
+
+            /*
++$GPGGA,101338.00,4630.9471,N,00719.523,E,1,12,1,3623.8,M,,,,*26
++$GPGLL,4630.9471,N,00719.523,E,101338.00,A*3D
++$GPRMC,101338.00,A,4630.9471,N,00719.523,E,0,33.83,250221,0.91,E*4A
+$GPGSV,3,1,12,04,26,291,92,05,32,062,86,06,05,029,33,09,47,095,98*78
+$GPGSV,3,2,12,12,60,224,88,20,21,240,85,22,28,311,93,24,81,037,77*78
+$GPGSV,3,3,12,25,160,124,85,26,321,240,90,28,90,200,90,30,181,137,87*65
++$GPGSA,A,3,04,05,06,09,12,20,22,24,25,26,28,30,1,1,1,*02
+$GPVTG,33.84,T,32.93,M,0,N,0,K*49
+            */
         }
 
         private void UpdateCount()
@@ -348,6 +380,33 @@ namespace Location_Bridge
             this.status = status;
             this.message = null;
             this.value = value;
+        }
+
+    }
+
+    class Location
+    {
+        public double lat { get; set; }
+        public double lon { get; set; }
+        public double alt { get; set; }
+        public double speed { get; set; }
+        public double ha { get; set; }
+        public double va { get; set; }
+        public DateTimeOffset time { get; set; }
+
+        public Location()
+        {
+        }
+
+        public Location(Location original)
+        {
+            lat = original.lat;
+            lon = original.lon;
+            alt = original.alt;
+            speed = original.speed;
+            ha = original.ha;
+            va = original.va;
+            time = original.time;
         }
     }
 
