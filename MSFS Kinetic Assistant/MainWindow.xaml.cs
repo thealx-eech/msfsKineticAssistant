@@ -504,25 +504,9 @@ namespace MSFS_Kinetic_Assistant
                 }
 
                 // LEVEL UP GLIDER BEFORE LAUNCH
-                if (_planeInfoResponse.OnAnyRunway == 100 && launchTime != 0 && (absoluteTime < launchTime || absoluteTime < (launchTime + 3) && _planeInfoResponse.AirspeedIndicated < 10 ))
+                if (_planeInfoResponse.SimOnGround == 100 && launchTime != 0 && _planeInfoResponse.AirspeedIndicated < 5 )
                 {
-                    _planeRotate.RotationVelocityBodyX = 0;
-                    _planeRotate.RotationVelocityBodyY = 0;
-                    _planeRotate.RotationVelocityBodyZ = -Math.Sin(_planeInfoResponse.PlaneBank) / Math.Max(1, launchTime - absoluteTime);
-
-                    Console.WriteLine($"Leveling {_planeRotate.RotationVelocityBodyZ:F5}");
-
-                    if (!double.IsNaN(_planeRotate.RotationVelocityBodyX) && !double.IsNaN(_planeRotate.RotationVelocityBodyY) && !double.IsNaN(_planeRotate.RotationVelocityBodyZ))
-                    {
-                        try
-                        {
-                            _fsConnect.UpdateData(Definitions.PlaneRotate, _planeRotate);
-                        }
-                        catch (Exception ex)
-                        {
-                            addLogMessage(ex.Message);
-                        }
-                    }
+                    levelUpGlider();
                 }
 
                 if (cableTension > 0)
@@ -548,6 +532,27 @@ namespace MSFS_Kinetic_Assistant
                     {
                         addLogMessage(ex.Message);
                     }
+                }
+            }
+        }
+
+        public void levelUpGlider()
+        {
+            _planeRotate.RotationVelocityBodyX = 0;
+            _planeRotate.RotationVelocityBodyY = 0;
+            _planeRotate.RotationVelocityBodyZ = -Math.Sin(_planeInfoResponse.PlaneBank) * Math.Pow(Math.Abs(Math.Sin(_planeInfoResponse.PlaneBank)), 0.5);
+
+            Console.WriteLine($"Leveling {_planeRotate.RotationVelocityBodyZ:F5}");
+
+            if (!double.IsNaN(_planeRotate.RotationVelocityBodyX) && !double.IsNaN(_planeRotate.RotationVelocityBodyY) && !double.IsNaN(_planeRotate.RotationVelocityBodyZ))
+            {
+                try
+                {
+                    _fsConnect.UpdateData(Definitions.PlaneRotate, _planeRotate);
+                }
+                catch (Exception ex)
+                {
+                    addLogMessage(ex.Message);
                 }
             }
         }
@@ -1143,7 +1148,6 @@ namespace MSFS_Kinetic_Assistant
                     _planeCommit.LIGHTTAXI = _planeCommit.LIGHTLANDING == 100 ? 0 : 100;
                 }
 
-
                 double bodyAcceleration = 0;
 
                 // GET ANGLE TO TUG POSITION
@@ -1153,6 +1157,11 @@ namespace MSFS_Kinetic_Assistant
                 // SET DESIRED ROPE LENGTH
                 towCableDesired = Math.Max(assistantSettings["realisticTowProcedures"] == 0 || _planeInfoResponse.SimOnGround != 100 || _planeInfoResponse.OnAnyRunway == 100 ? 80 : 40, winchPosition.airspeed);
 
+                // LEVEL UP GLIDER BEFORE LAUNCH
+                if (_planeInfoResponse.SimOnGround == 100 && _planeInfoResponse.AirspeedIndicated < 5)
+                {
+                    levelUpGlider();
+                }
 
                 // GET FINAL CABLE TENSION
                 double accelerationLimit = (assistantSettings["realisticFailures"] == 1 ? 8 : 40) * 9.81;
@@ -1952,11 +1961,12 @@ namespace MSFS_Kinetic_Assistant
                         absoluteTime = _planeCommit.AbsoluteTime;
 
                         // PAUSE?
-                        if (_planeInfoResponse.AirspeedIndicated == _planeInfoResponseLast.AirspeedIndicated &&
+                        if (_planeInfoResponse.SimOnGround != 100 &&
+                            (_planeInfoResponse.AirspeedIndicated == _planeInfoResponseLast.AirspeedIndicated &&
                             _planeInfoResponse.GpsGroundSpeed == _planeInfoResponseLast.GpsGroundSpeed &&
                             _planeInfoResponse.Altitude == _planeInfoResponseLast.Altitude &&
                             _planeInfoResponse.PlaneBank == _planeInfoResponseLast.PlaneBank &&
-                            _planeInfoResponse.PlanePitch == _planeInfoResponseLast.PlanePitch)
+                            _planeInfoResponse.PlanePitch == _planeInfoResponseLast.PlanePitch))
                         {
                             lastFrameTiming = 0;
                         }
@@ -2086,14 +2096,17 @@ namespace MSFS_Kinetic_Assistant
                             {
                                 TowInfoPitch towCommit = new TowInfoPitch();
                                 towCommit.Bank = response.Bank;
+                                towCommit.Pitch = 0;
                                 towCommit.Heading = response.Heading;
+                                towCommit.VelocityBodyZ = response.Airspeed;
+                                towCommit.VelocityBodyY = response.Verticalspeed;
 
                                 if (assistantSettings["realisticTowProcedures"] == 0)
                                 {
-                                    double liftPower = 2 * Math.Pow(Math.Min(assistantSettings["aiSpeed"] / 1.96, response.Airspeed) / assistantSettings["aiSpeed"] / 1.96, 0.5) * lastFrameTiming;
+                                    double liftPower = towCommit.VelocityBodyZ > 15 ? (towCommit.VelocityBodyZ - 15) * 0.1 : 0;
 
                                     // CONTROL DUMB AIRSPEED
-                                    towCommit.VelocityBodyZ = response.Airspeed + 5 * lastFrameTiming;
+                                    towCommit.VelocityBodyZ += 5 * lastFrameTiming;
 
                                     // LIMIT ALTITUDE
                                     if (response.Altitude > towToggledAltitude + 2500 && _planeInfoResponse.AltitudeAboveGround > 100)
@@ -2102,23 +2115,23 @@ namespace MSFS_Kinetic_Assistant
                                         towCommit.VelocityBodyY = -0.1;
                                     }
                                     // LIMIT SINK RATE
-                                    else if (response.Verticalspeed < -0.1)
+                                    else if (response.Verticalspeed < -1)
                                     {
                                         Console.WriteLine("AI Sink limit");
                                         towCommit.VelocityBodyY = liftPower;
                                     }
                                     // ADD VERICAL SPEED
-                                    else if (response.Altitude < towToggledAltitude + 2000 && response.Airspeed > 5)
+                                    else if (response.Altitude < towToggledAltitude + 2000 && towCommit.VelocityBodyZ > 5)
                                     {
                                         Console.WriteLine("AI Lift up");
-                                        towCommit.VelocityBodyY = Math.Min(10, response.Verticalspeed + liftPower);
+                                        towCommit.VelocityBodyY = Math.Min(10, liftPower);
                                     }
                                 }
 
                                 // LIMIT AIRSPEED
-                                if (response.Airspeed > assistantSettings["aiSpeed"] / 1.96)
+                                if (towCommit.VelocityBodyZ > assistantSettings["aiSpeed"] / 1.96)
                                 {
-                                    towCommit.VelocityBodyZ = 0.9 * assistantSettings["aiSpeed"] / 1.96 + 0.1 * response.Airspeed;
+                                    towCommit.VelocityBodyZ = 0.9 * assistantSettings["aiSpeed"] / 1.96 + 0.1 * towCommit.VelocityBodyZ;
                                 }
 
                                 if (!double.IsNaN(towCommit.Heading) && !double.IsNaN(towCommit.Pitch) && !double.IsNaN(towCommit.Bank) && !double.IsNaN(towCommit.VelocityBodyY) &&
