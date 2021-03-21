@@ -138,6 +138,7 @@
       <DependentUpon>App.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="Tracking.cs" />
     <Compile Include="RadarClass.cs" />
     <Compile Include="Server.cs" />
     <Compile Include="SimvarsViewModel.cs" />
@@ -193,40 +194,41 @@
     </BootstrapperPackage>
   </ItemGroup>
   <ItemGroup>
-    <Resource Include="glider.bmp" />
+    <Resource Include="MEDIA\glider.bmp" />
   </ItemGroup>
   <ItemGroup>
-    <Resource Include="arrestor.bmp" />
-    <Resource Include="launchpad.bmp" />
-    <Resource Include="settings.bmp" />
+    <Resource Include="MEDIA\arrestor.bmp" />
+    <Resource Include="MEDIA\launchpad.bmp" />
+    <Resource Include="MEDIA\settings.bmp" />
   </ItemGroup>
   <ItemGroup>
-    <Resource Include="ctrl.png" />
+    <Resource Include="MEDIA\ctrl.png" />
   </ItemGroup>
   <ItemGroup>
-    <Resource Include="ctrl1.png" />
+    <Resource Include="MEDIA\ctrl1.png" />
   </ItemGroup>
   <ItemGroup>
-    <Resource Include="ctrl2.png" />
+    <Resource Include="MEDIA\ctrl2.png" />
   </ItemGroup>
   <ItemGroup>
-    <Resource Include="winchIcon.png" />
-    <Resource Include="wp.png" />
-    <Resource Include="close.png" />
-    <Resource Include="csv.png" />
-    <Content Include="error.wav" />
-    <Content Include="false.wav" />
-    <Resource Include="minimize.png" />
-    <Resource Include="pinned.png" />
-    <Resource Include="solid.png" />
-    <Resource Include="transparent.png" />
-    <Resource Include="unpinned.png" />
-    <Resource Include="tow.bmp" />
-    <Resource Include="map.png" />
-    <Resource Include="RadarCover.png" />
-    <Resource Include="gliderIcon.png" />
-    <Content Include="true.wav" />
+    <Resource Include="MEDIA\winchIcon.png" />
+    <Resource Include="MEDIA\wp.png" />
+    <Resource Include="MEDIA\close.png" />
+    <Resource Include="MEDIA\csv.png" />
+    <Content Include="MEDIA\error.wav" />
+    <Content Include="MEDIA\false.wav" />
+    <Resource Include="MEDIA\minimize.png" />
+    <Resource Include="MEDIA\pinned.png" />
+    <Resource Include="MEDIA\solid.png" />
+    <Resource Include="MEDIA\transparent.png" />
+    <Resource Include="MEDIA\unpinned.png" />
+    <Resource Include="MEDIA\tow.bmp" />
+    <Resource Include="MEDIA\map.png" />
+    <Resource Include="MEDIA\RadarCover.png" />
+    <Resource Include="MEDIA\gliderIcon.png" />
+    <Content Include="MEDIA\true.wav" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="..\packages\CTrue.FsConnect.1.0.3\build\CTrue.FsConnect.targets" Condition="Exists('..\packages\CTrue.FsConnect.1.0.3\build\CTrue.FsConnect.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

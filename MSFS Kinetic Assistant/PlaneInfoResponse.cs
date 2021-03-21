@@ -67,6 +67,7 @@ namespace MSFS_Kinetic_Assistant
         public double Airspeed;
         public double Verticalspeed;
         public double Heading;
+        public double Pitch;
         public double Bank;
         public double SimOnGround;
         public double OnAnyRunway;

@@ -64,6 +64,13 @@ namespace MSFS_Kinetic_Assistant
 
             return new GeoLocation(endLatRads, endLonRads);
         }
+        public GeoLocation RotatePointFrom(GeoLocation startPoint, double initialBearingRadians, GeoLocation endPoint)
+        {
+            double dist = findDistanceBetweenPoints(startPoint.Latitude, startPoint.Longitude, endPoint.Latitude, endPoint.Longitude);
+            double bearing = findBearingToPoint(startPoint.Latitude, startPoint.Longitude, endPoint.Latitude, endPoint.Longitude);
+
+            return FindPointAtDistanceFrom(startPoint, bearing + initialBearingRadians, dist / 1000);
+        }
         public double findDistanceBetweenPoints(double rlat1, double rlon1, double rlat2, double rlon2)
         {
             double rtheta = rlon1 - rlon2;

@@ -16,7 +16,7 @@ namespace MSFS_Kinetic_Assistant
 {
     class RadarClass
     {
-        public void InitRadar(Canvas RadarCanvas, double coverScale)
+        public void InitRadar(Canvas RadarCanvas, double coverScale, double allowedRadarScale)
         {
             Canvas group = new Canvas();
             group.Width = 250;
@@ -107,11 +107,11 @@ namespace MSFS_Kinetic_Assistant
             group3.Height = 30;
             group3.Name = "Plane";
             group3.Opacity = 0.5;
-            group3.Background = new ImageBrush(new BitmapImage(new Uri("pack://application:,,,/gliderIcon.png")));
+            group3.Background = new ImageBrush(new BitmapImage(new Uri("pack://application:,,,/media/gliderIcon.png")));
 
             Line dashV = new Line();
             Line dashH = new Line();
-            dashV.Fill = dashH.Fill = new SolidColorBrush(Color.FromArgb(255, 0,0,255));
+            dashV.Fill = dashH.Fill = new SolidColorBrush(Color.FromArgb(255, 0, 0, 255));
             dashV.Stroke = dashH.Stroke = new SolidColorBrush(Color.FromArgb(255, 0, 0, 255));
             DoubleCollection dashArray = new DoubleCollection();
             dashArray.Add(2);
@@ -134,14 +134,15 @@ namespace MSFS_Kinetic_Assistant
 
             RadarCanvas.Children.Add(group3);
 
-#if DEBUG
-            Canvas group4 = new Canvas();
-            group4.Name = "RadarCover";
-            group4.Background = new ImageBrush(new BitmapImage(new Uri("pack://application:,,,/RadarCover.png")));
-            Canvas.SetZIndex(group4, 1000);
-            RadarCanvas.Children.Add(group4);
-            updateRadarCover(RadarCanvas, coverScale);
-#endif
+            if (allowedRadarScale < 50)
+            {
+                Canvas group4 = new Canvas();
+                group4.Name = "RadarCover";
+                group4.Background = new ImageBrush(new BitmapImage(new Uri("pack://application:,,,/media/RadarCover.png")));
+                Canvas.SetZIndex(group4, 1000);
+                RadarCanvas.Children.Add(group4);
+                updateRadarCover(RadarCanvas, coverScale);
+            }
         }
         public void ClearRadar(Canvas RadarCanvas)
         {
@@ -151,21 +152,19 @@ namespace MSFS_Kinetic_Assistant
         // COVER
         public void updateRadarCover(Canvas RadarCanvas, double coverScale)
         {
-#if DEBUG
             foreach (var el in RadarCanvas.Children)
             {
                 if (el.GetType() == typeof(Canvas) && ((Canvas)el).Name == "RadarCover")
                 {
                     Canvas cover = ((Canvas)el);
-                    cover.Width =  250 / coverScale;
+                    cover.Width = 250 / coverScale;
                     cover.Height = 250 / coverScale;
-                    Canvas.SetLeft(cover, - cover.Width / 2 + 125);
-                    Canvas.SetTop(cover, - cover.Height / 2 + 125);
+                    Canvas.SetLeft(cover, -cover.Width / 2 + 125);
+                    Canvas.SetTop(cover, -cover.Height / 2 + 125);
 
                     break;
                 }
             }
-#endif
         }
 
         // COMPASS
@@ -202,7 +201,7 @@ namespace MSFS_Kinetic_Assistant
             group.Height = 20;
             group.Name = "Winch";
 
-            group.Background = new ImageBrush(new BitmapImage(new Uri("pack://application:,,,/winchIcon.png")));
+            group.Background = new ImageBrush(new BitmapImage(new Uri("pack://application:,,,/media/winchIcon.png")));
             group.Opacity = 0.5;
 
             RadarCanvas.Children.Add(group);
@@ -516,7 +515,7 @@ namespace MSFS_Kinetic_Assistant
                                 cnv.Height = width / 2 / scale;
                                 Canvas.SetLeft(cnv, 125 - cnv.Width / 2 + distance / scale * Math.Sin(heading));
                                 Canvas.SetTop(cnv, 125 - distance / scale * Math.Cos(heading));
-                                cnv.Background = new ImageBrush(new BitmapImage(new Uri("pack://application:,,,/wp.png")));
+                                cnv.Background = new ImageBrush(new BitmapImage(new Uri("pack://application:,,,/media/wp.png")));
                                 cnv.Background.Opacity = opacity;
 
                                 RotateTransform rotateTransform = new RotateTransform(nextBearing * 180 / Math.PI, cnv.Width / 2, 0);

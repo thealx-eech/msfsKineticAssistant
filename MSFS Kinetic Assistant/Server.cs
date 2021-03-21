@@ -276,6 +276,8 @@ namespace MSFS_Kinetic_Assistant
                     direct = "E";
             }
 
+            coord = Math.Abs(coord);
+
             int deg = (int)Math.Floor(coord);
             double min = (coord % 1) * 60;
             var nmea = deg.ToString() + min.ToString("00.0000000", CultureInfo.InvariantCulture) + "," + direct;
