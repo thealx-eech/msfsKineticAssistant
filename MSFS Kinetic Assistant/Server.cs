@@ -84,7 +84,7 @@ namespace MSFS_Kinetic_Assistant
             /*if (Properties.Settings.Default.LocalOnly)
                 localEndPoint = new IPEndPoint(IPAddress.Loopback, 10110);
             else*/
-                localEndPoint = new IPEndPoint(ipAddress, 10110);
+            localEndPoint = new IPEndPoint(ipAddress, 10110);
 
             var socketServer = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             callback(new ServerStatus(Resources.Waiting));
@@ -197,7 +197,8 @@ namespace MSFS_Kinetic_Assistant
                         String.Format(Resources._0RefusedTooManyConnections, addr)));
                 }
             }
-            catch (Exception ex) {
+            catch (Exception ex)
+            {
                 Console.Write("EXCEPTION: Can't process callback " + ex.Message);
             }
         }
@@ -237,7 +238,8 @@ namespace MSFS_Kinetic_Assistant
             {
                 return !(socket.Poll(1, SelectMode.SelectRead) && socket.Available == 0);
             }
-            catch (SocketException ex) {
+            catch (SocketException ex)
+            {
                 Console.Write("EXCEPTION: IsConnected error " + ex.Message);
                 return false;
             }
@@ -299,7 +301,7 @@ namespace MSFS_Kinetic_Assistant
             var lat = NmeaCoord(location.lat, true);
             var lon = NmeaCoord(location.lon, false);
             var alt = location.alt.ToString("F1");
-            var speed = (location.speed * 1.9).ToString("F3") ;
+            var speed = (location.speed * 1.9).ToString("F3");
             var time = location.time.ToString("HHmmss.ff");
             var date = location.time.ToString("ddmmyy");
             var ha = location.ha.ToString("0.0");

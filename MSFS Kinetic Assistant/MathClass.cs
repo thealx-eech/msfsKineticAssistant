@@ -188,17 +188,21 @@ namespace MSFS_Kinetic_Assistant
     }
     public class Waypoint
     {
-        public Waypoint(GeoLocation loc, string name, string entered, string passed)
+        public Waypoint(GeoLocation loc, string name, string entered, string passed, double weight, double wind)
         {
             Location = loc;
             Name = name;
             Entered = entered;
             Passed = passed;
+            Weight = weight;
+            Wind = wind;
         }
 
         public GeoLocation Location { get; set; }
         public string Name { get; set; }
         public string Entered { get; set; }
         public string Passed { get; set; }
+        public double Weight { get; set; }
+        public double Wind { get; set; }
     }
 }

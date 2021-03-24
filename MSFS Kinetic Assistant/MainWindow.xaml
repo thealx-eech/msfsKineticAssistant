@@ -194,8 +194,33 @@
                                 <RowDefinition Height="125"></RowDefinition>
                                 <RowDefinition Height="125"></RowDefinition>
                             </Grid.RowDefinitions>
-                            <Canvas Grid.Row="0" Name="VerticalWindPos" Width="10" VerticalAlignment="Bottom" Height="0" Background="#20FF0000"></Canvas>
-                            <Canvas Grid.Row="1" Name="VerticalWindNeg" Width="10" VerticalAlignment="Top" Height="0" Background="#200000FF"></Canvas>
+                            <Canvas Grid.Row="0" Width="10" VerticalAlignment="Bottom" Height="125" Background="#FFFF0000">
+                                <Line X1="0" X2="10" Y1="25" Y2="25" Stroke="White" StrokeThickness="1"></Line>
+                                <Line X1="0" X2="10" Y1="35" Y2="35" Stroke="White" StrokeThickness="1"></Line>
+                                <Line X1="0" X2="10" Y1="45" Y2="45" Stroke="White" StrokeThickness="1"></Line>
+                                <Line X1="0" X2="10" Y1="55" Y2="55" Stroke="White" StrokeThickness="1"></Line>
+                                <Line X1="0" X2="10" Y1="65" Y2="65" Stroke="White" StrokeThickness="1"></Line>
+                                <Line X1="0" X2="10" Y1="75" Y2="75" Stroke="White" StrokeThickness="1"></Line>
+                                <Line X1="0" X2="10" Y1="85" Y2="85" Stroke="White" StrokeThickness="1"></Line>
+                                <Line X1="0" X2="10" Y1="95" Y2="95" Stroke="White" StrokeThickness="1"></Line>
+                                <Line X1="0" X2="10" Y1="105" Y2="105" Stroke="White" StrokeThickness="1"></Line>
+                                <Line X1="0" X2="10" Y1="115" Y2="115" Stroke="White" StrokeThickness="1"></Line>
+                            </Canvas>
+                            <Canvas Grid.Row="0" Name="VerticalWindPos" Width="10" VerticalAlignment="Top" Height="125" Background="#FFFFFFFF"></Canvas>
+
+                            <Canvas Grid.Row="1" Width="10" VerticalAlignment="Top" Height="125" Background="#FF0000FF">
+                                <Line X1="0" X2="10" Y1="10" Y2="10" Stroke="White" StrokeThickness="1"></Line>
+                                <Line X1="0" X2="10" Y1="20" Y2="20" Stroke="White" StrokeThickness="1"></Line>
+                                <Line X1="0" X2="10" Y1="30" Y2="30" Stroke="White" StrokeThickness="1"></Line>
+                                <Line X1="0" X2="10" Y1="40" Y2="40" Stroke="White" StrokeThickness="1"></Line>
+                                <Line X1="0" X2="10" Y1="50" Y2="50" Stroke="White" StrokeThickness="1"></Line>
+                                <Line X1="0" X2="10" Y1="60" Y2="60" Stroke="White" StrokeThickness="1"></Line>
+                                <Line X1="0" X2="10" Y1="70" Y2="70" Stroke="White" StrokeThickness="1"></Line>
+                                <Line X1="0" X2="10" Y1="80" Y2="80" Stroke="White" StrokeThickness="1"></Line>
+                                <Line X1="0" X2="10" Y1="90" Y2="90" Stroke="White" StrokeThickness="1"></Line>
+                                <Line X1="0" X2="10" Y1="100" Y2="100" Stroke="White" StrokeThickness="1"></Line>
+                            </Canvas>
+                            <Canvas Grid.Row="1" Name="VerticalWindNeg" Width="10" VerticalAlignment="Bottom" Height="125" Background="#FFFFFFFF"></Canvas>
                         </Grid>
                     </StackPanel>
                     <Canvas Name="RadarCanvas" Grid.Column="1" ClipToBounds="True"  Height="250" Grid.ColumnSpan="2">
@@ -227,7 +252,7 @@
             </StackPanel>
             <StackPanel Grid.Column="0" HorizontalAlignment="Right" Width="275">
                 <StackPanel Margin="10, 10, 46, 10" >
-                    <Slider Style="{StaticResource Horizontal_Slider}"  Margin="0, -15, 0, -3" ValueChanged="saveSettings" ToolTip="SimConnect requests per second" Name="RequestsFrequency" IsSnapToTickEnabled="True" TickFrequency="1" Minimum="5" Maximum="18" Value="18" AutoToolTipPlacement="TopLeft"  AutoToolTipPrecision="0" ></Slider>
+                    <Slider Style="{StaticResource Horizontal_Slider}"  Margin="0, -15, 0, -3" ValueChanged="saveSettings" ToolTip="SimConnect requests per second" Name="RequestsFrequency" IsSnapToTickEnabled="True" TickFrequency="1" Minimum="10" Maximum="18" Value="18" AutoToolTipPlacement="TopLeft"  AutoToolTipPrecision="0" ></Slider>
                     <Button x:Name="connectButton" Height="26px" Background="#55FFFFFF" Foreground="DarkGreen" BorderBrush="DarkGreen" Click="toggleConnect" VerticalAlignment="Top">CONNECT</Button>
                 </StackPanel>
                 <TabControl VerticalAlignment="Stretch" Height="326px" TabStripPlacement="Right" Background="Transparent">
@@ -461,7 +486,7 @@
                                 <Button Background="#55FFFFFF" Foreground="DarkGreen" BorderBrush="DarkGreen" Grid.Column="2" Click="ClearRecords" Name="ClearRecordsButton" VerticalAlignment="Top" HorizontalAlignment="Stretch">CLEAR</Button>
                                 <Button Background="#55FFFFFF" Foreground="DarkGreen" BorderBrush="DarkGreen" Grid.Column="3" Click="StartRecord" Name="StartRecordButton" VerticalAlignment="Top" HorizontalAlignment="Stretch">REC</Button>
                             </Grid>
-                            <CheckBox Click="saveSettings" Name="ghostTeleport">Teleport to my position</CheckBox>
+                            <CheckBox Click="saveSettings" Name="ghostTeleport" ToolTip="If you are more than 100m away from start point">Teleport to my position</CheckBox>
                             <ScrollViewer VerticalScrollBarVisibility="Visible" Height="280">
                                 <StackPanel Name="GhostsList">
                                 </StackPanel>
@@ -671,10 +696,15 @@
                             </TextBlock>
 
 
-
-                            <TextBlock TextWrapping="Wrap" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="5, 10, 5, 0">
-                                Support: msfs@touching.cloud
+                            <TextBlock TextWrapping="Wrap" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="5, 5, 5, 0">
+                                Events and support:
                             </TextBlock>
+                            <TextBlock TextWrapping="Wrap" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0, 0, 0, 0">
+                                <Hyperlink NavigateUri="https://discord.gg/6rueC2c8qc" RequestNavigate="Hyperlink_RequestNavigate">
+                                    ALBATROSS &#38; TouchingCloud Discord
+                                </Hyperlink>
+                            </TextBlock>
+
 
                         </StackPanel>
                     </TabItem>

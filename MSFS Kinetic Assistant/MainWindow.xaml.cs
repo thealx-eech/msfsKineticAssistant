@@ -72,6 +72,7 @@ namespace MSFS_Kinetic_Assistant
         private List<winchPosition> thermalsListAPI = new List<winchPosition>();
         private double windDirection;
         private double windVelocity;
+        private double thermalFlow = 0;
         private double dayTimeModifier;
         private double overcastModifier;
         private int scaleRefresh = 0;
@@ -142,7 +143,7 @@ namespace MSFS_Kinetic_Assistant
 #if DEBUG
         double allowedRadarScale = 5;
         double allowedRecords = 3;
-        double allowedRecordLength = 60; // SEC
+        double allowedRecordLength = 600; // SEC
 #else
         double allowedRadarScale = 50;
         double allowedRecords = 999;
@@ -208,7 +209,7 @@ namespace MSFS_Kinetic_Assistant
             dispatcherTimer.Start();
 
             launchTimer = new DispatcherTimer();
-            launchTimer.Interval = new TimeSpan(0, 0, 0, 0, 1000 / Math.Max(5, (int)(assistantSettings.ContainsKey("RequestsFrequency") ? assistantSettings["RequestsFrequency"] : 5)));
+            launchTimer.Interval = new TimeSpan(0, 0, 0, 0, 1000 / Math.Max(10, (int)(assistantSettings.ContainsKey("RequestsFrequency") ? assistantSettings["RequestsFrequency"] : 10)));
             launchTimer.Tick += new EventHandler(launchInterval);
             launchTimer.Start();
 
@@ -745,7 +746,8 @@ namespace MSFS_Kinetic_Assistant
                 if (restrictionsPassed())
                 {
                     // ATC 
-                    if (assistantSettings["realisticTowProcedures"] != 0) {
+                    if (assistantSettings["realisticTowProcedures"] != 0)
+                    {
                         if (File.Exists(optPath + @"MISSIONS\Custom\CustomFlight\CUSTOMFLIGHT.PLN"))
                         {
                             plnPath = optPath + @"MISSIONS\Custom\CustomFlight\CUSTOMFLIGHT";
@@ -774,7 +776,7 @@ namespace MSFS_Kinetic_Assistant
                             insertTowPlanePressed = _planeInfoResponse.AbsoluteTime;
                         }
                     }
-					// RECORDED
+                    // RECORDED
                     else if (towPlaneTrack.Items.Count > 0)
                     {
                         string trackName = ((ComboBoxItem)(towPlaneTrack.SelectedItem)).Tag.ToString();
@@ -848,7 +850,6 @@ namespace MSFS_Kinetic_Assistant
             if (assistantSettings["realisticTowProcedures"] == 0)
             {
                 //towSearchRadius.Text = menuValue.ToString(".0");
-                RadarScale.Value = menuValue;
                 towCableDesired *= 2;
                 cableLength = towCableDesired - 10;
                 //teleportTowPlane(id);
@@ -857,14 +858,19 @@ namespace MSFS_Kinetic_Assistant
             else if (direction.distance + 10 < towCableDesired)
             {
                 //towSearchRadius.Text = menuValue.ToString(".0");
-                RadarScale.Value = menuValue;
             }
             else
             {
                 cableLength = direction.distance;
                 menuValue = (cableLength + 10) * 1.5;
                 //towSearchRadius.Text = menuValue.ToString(".0");
+            }
+
+            if (RadarScale.Value < menuValue)
+            {
                 RadarScale.Value = menuValue;
+                assistantSettings["RadarScale"] = RadarScale.Value;
+                saveSettings(RadarScale, null);
             }
 
             insertedTowPlane = new KeyValuePair<uint, bool>(id, true);
@@ -1870,6 +1876,7 @@ namespace MSFS_Kinetic_Assistant
             // WIND MODIFIERS
             double windModifier = 0;
             double thermalLeaning = 0;
+
             if (assistantSettings.ContainsKey("thermalsType") && assistantSettings["thermalsType"] >= 1)
             {
                 windModifier = Math.Pow(Math.Min(Math.Max(0, windVelocity / 50), 1), 0.5);
@@ -1933,15 +1940,17 @@ namespace MSFS_Kinetic_Assistant
                         double verticalModifier = acAltitude < topEdge ?
                             (Math.Abs(acAltitude / topEdge) < 0.2 ? Math.Abs(acAltitude / topEdge) / 0.2 : 1) : // UNDER INVERSION
                             (inversionLayer - (acAltitude - topEdge)) / (inversionLayer); // ABOVE INVERSION
-                        
+
                         double pitchBankModifier = Math.Abs(Math.Cos(_planeInfoResponse.PlaneBank)) * Math.Abs(Math.Cos(_planeInfoResponse.PlanePitch)); // ROTATION
-                        
+
                         double airspeedModifier = _planeInfoResponse.AirspeedIndicated < 100 ? Math.Pow(Math.Max(0, 1 - _planeInfoResponse.AirspeedIndicated / 100), 0.15) : 0; // OVERSPEED
                         airspeedModifier *= _planeInfoResponse.AirspeedIndicated > 20 ? Math.Pow(Math.Max(0, (_planeInfoResponse.AirspeedIndicated - 20) / 80), 0.15) : 0; // STALL
-                        
+
                         double ambientModifier = (1 - windModifier) * overcastModifier * dayTimeModifier;
 
-                        finalModifier = Math.Max(0, horizontalModifier * verticalModifier * pitchBankModifier * airspeedModifier * ambientModifier - 0.1);
+                        finalModifier = horizontalModifier * verticalModifier * ambientModifier;
+                        thermalFlow += thermal.airspeed * finalModifier;
+                        finalModifier = finalModifier * pitchBankModifier * airspeedModifier;
 
                         double liftAmount = thermal.airspeed * finalModifier;
 
@@ -1959,7 +1968,7 @@ namespace MSFS_Kinetic_Assistant
                             liftAmount /= 2.0;
                         }
 
-                        Console.WriteLine("LiftY: " + liftAmount + " VerticalSpeed: " + _planeInfoResponse.VerticalSpeed);
+                        Console.WriteLine("LiftY: " + liftAmount + " thermalFlow: " + thermalFlow + " VSpeed: " + _planeInfoResponse.VerticalSpeed);
 
                         if (liftAmount != 0)
                         {
@@ -1968,7 +1977,8 @@ namespace MSFS_Kinetic_Assistant
                             //_planeCommit.VelocityBodyZ -= _thermalDirection.localForceDirection.Z * liftAmount * lastFrameTiming;
 
                             // FORWARD SPEED COMPENSATION
-                            _planeCommit.VelocityBodyZ += _planeCommit.VelocityBodyZ * Math.Pow(Math.Abs(lastFrameTiming), 2.5) * horizontalModifier * verticalModifier * airspeedModifier;
+                            double rateModifier = assistantSettings.ContainsKey("RequestsFrequency") ? assistantSettings["RequestsFrequency"] / 18 : 1;
+                            _planeCommit.VelocityBodyZ += _planeCommit.VelocityBodyZ * Math.Pow(Math.Abs(lastFrameTiming), 2.5) * horizontalModifier * verticalModifier * airspeedModifier * rateModifier;
 
                             if (!double.IsNaN(_planeCommit.VelocityBodyX) && !double.IsNaN(_planeCommit.VelocityBodyY) && !double.IsNaN(_planeCommit.VelocityBodyZ))
                             {
@@ -2017,8 +2027,8 @@ namespace MSFS_Kinetic_Assistant
 
                         trackControlChanges();
 
-                        Application.Current.Dispatcher.Invoke(() => VerticalWindPos.Height = Math.Max(0, _planeInfoResponse.AmbientWindY * 1.94) * 6.25);
-                        Application.Current.Dispatcher.Invoke(() => VerticalWindNeg.Height = Math.Abs(Math.Min(0, _planeInfoResponse.AmbientWindY * 1.94) * 6.25));
+                        Application.Current.Dispatcher.Invoke(() => VerticalWindPos.Height = 125 - Math.Min(Math.Max(0, (_planeInfoResponse.AmbientWindY + thermalFlow) * 1.94) * 6.25, 125));
+                        Application.Current.Dispatcher.Invoke(() => VerticalWindNeg.Height = 125 - Math.Min(Math.Abs(Math.Min(0, (_planeInfoResponse.AmbientWindY + thermalFlow) * 1.94) * 6.25), 125));
 
                         // UPDATE KK7 DATA
                         if ((assistantSettings.ContainsKey("KK7Autoload") && assistantSettings["KK7Autoload"] == 1 || assistantSettings.ContainsKey("OpenAipAutoload") && assistantSettings["OpenAipAutoload"] == 1) &&
@@ -2105,6 +2115,7 @@ namespace MSFS_Kinetic_Assistant
                                 processLaunchpad();
                             }
                             // THERMALS PHYSICS
+                            thermalFlow = 0;
                             if (thermalsWorking)
                             {
                                 //Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Children.Clear());
@@ -2157,7 +2168,7 @@ namespace MSFS_Kinetic_Assistant
                             towCommit.VelocityBodyZ = response.Airspeed;
                             towCommit.VelocityBodyY = response.Verticalspeed;
 
-                            towCommit = _trackingClass.updateGhostPlayer(e.ObjectID, response, towCommit, _mathClass, absoluteTime);
+                            towCommit = _trackingClass.updateGhostPlayer(e.ObjectID, response, towCommit, _fsConnect, _mathClass, absoluteTime);
                             if (_trackingClass.message.Key != 0)
                             {
                                 switch (_trackingClass.message.Value)
@@ -2167,7 +2178,7 @@ namespace MSFS_Kinetic_Assistant
                                             attachTowCable(null, null);
                                         break;
                                     case "REMOVE":
-                                        Application.Current.Dispatcher.Invoke(() => removeRecordSlider(_trackingClass.message.Key)); 
+                                        Application.Current.Dispatcher.Invoke(() => removeRecordSlider(_trackingClass.message.Key));
                                         break;
                                     default:
                                         showMessage(_trackingClass.message.Value, _fsConnect);
@@ -2468,13 +2479,24 @@ namespace MSFS_Kinetic_Assistant
             {
                 if (tb.Tag != null)
                 {
-                    if (tb.SelectedItem.ToString().Replace(" ", "") == fieldName)
+                    try
                     {
-                        Console.WriteLine("Triggering function " + tb.Tag.ToString());
-                        Type type = Application.Current.MainWindow.GetType();
-                        MethodInfo method = type.GetMethod(tb.Tag.ToString());
-                        method.Invoke(Application.Current.MainWindow, new object[] { null, null });
+                        if (tb.SelectedItem != null && tb.SelectedItem.ToString().Replace(" ", "") == fieldName)
+                        {
+                            Console.WriteLine("Triggering function " + tb.Tag.ToString());
+                            Type type = Application.Current.MainWindow.GetType();
+                            MethodInfo method = type.GetMethod(tb.Tag.ToString(), BindingFlags.NonPublic | BindingFlags.Instance);
+                            if (method != null)
+                            {
+                                method.Invoke(Application.Current.MainWindow, new object[] { null, null });
+                            }
+                            else
+                            {
+                                addLogMessage("Function " + tb.Tag.ToString() + " can't be triggered");
+                            }
+                        }
                     }
+                    catch { }
                 }
             }
         }
@@ -2503,6 +2525,8 @@ namespace MSFS_Kinetic_Assistant
             definition.Add(new SimProperty(FsSimVar.AirspeedIndicated, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
             definition.Add(new SimProperty(FsSimVar.Verticalspeed, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
             definition.Add(new SimProperty(FsSimVar.AmbientWindY, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
+            definition.Add(new SimProperty(FsSimVar.TotalWeight, FsUnit.Pounds, SIMCONNECT_DATATYPE.FLOAT64));
+            definition.Add(new SimProperty(FsSimVar.SimRate, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
 
             // LIGHT STUFF
             definition.Add(new SimProperty(FsSimVar.LIGHTPANEL, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
@@ -2868,12 +2892,16 @@ namespace MSFS_Kinetic_Assistant
                                 ServerStop();
                             }
                         }
+                        /*else if (((ComboBox)sender).Name == "preferredServer")
+                        {
+                            loadEventsList(null, null);
+                        }*/
                     }
                     else if (sender != null && sender.GetType() == typeof(Slider))
                     {
                         if (((Slider)sender).Name == "RequestsFrequency")
                         {
-                            launchTimer.Interval = new TimeSpan(0, 0, 0, 0, 1000 / Math.Max(5, (int)assistantSettings["RequestsFrequency"]));
+                            launchTimer.Interval = new TimeSpan(0, 0, 0, 0, 1000 / Math.Max(10, (int)assistantSettings["RequestsFrequency"]));
                             //Console.WriteLine("NEW INTERVAL: " + launchTimer.Interval.ToString());
                         }
                         else if (((Slider)sender).Name == "RadarScale")
@@ -3302,9 +3330,12 @@ namespace MSFS_Kinetic_Assistant
             if (towPlane)
             {
                 towScanType.SelectedIndex = 1;
-                RadarScale.Value = 0.2;
-                assistantSettings["RadarScale"] = 0.2;
-                saveSettings(RadarScale, null);
+                if (RadarScale.Value < 0.2)
+                {
+                    RadarScale.Value = 0.2;
+                    assistantSettings["RadarScale"] = RadarScale.Value;
+                }
+                saveSettings(towScanType, null);
             }
             else if (assistantSettings["RadarScale"] < 5)
             {
@@ -3318,7 +3349,7 @@ namespace MSFS_Kinetic_Assistant
             {
                 _trackingClass.ghostTeleport.radius = _planeInfoResponse.PlaneHeading;
                 _trackingClass.ghostTeleport.alt = _planeInfoResponse.Altitude;
-                _trackingClass.ghostTeleport.location = _mathClass.FindPointAtDistanceFrom(new GeoLocation(_planeInfoResponse.Latitude, _planeInfoResponse.Longitude), _planeInfoResponse.PlaneHeading, 0.04);
+                _trackingClass.ghostTeleport.location = _mathClass.FindPointAtDistanceFrom(new GeoLocation(_planeInfoResponse.Latitude, _planeInfoResponse.Longitude), _planeInfoResponse.PlaneHeading, 0.075);
             }
         }
 
@@ -3341,7 +3372,7 @@ namespace MSFS_Kinetic_Assistant
                         position.Pitch = gp.TrackPoints[0].Pitch * 180 / Math.PI;
                         position.Bank = gp.TrackPoints[0].Roll * 180 / Math.PI;
                         position.Airspeed = 0;
-                        position.OnGround = (uint)(gp.TrackPoints[0].AltitudeAboveGround < 5 ? 1 : 0);
+                        position.OnGround = 0;// (uint)(gp.TrackPoints[0].AltitudeAboveGround < 5 ? 1 : 0);
 
                         _fsConnect.CreateNonATCAircraft(position, gp.Name, Requests.TowPlane);
 
@@ -3349,7 +3380,7 @@ namespace MSFS_Kinetic_Assistant
                     }
                     else
                     {
-                        showMessage($"Failed to insert AI plane - you are {distance/1000:F1}km away from ghost position", _fsConnect);
+                        showMessage($"Failed to insert AI plane - you are {distance / 1000:F1}km away from ghost position", _fsConnect);
                     }
                 }
             }

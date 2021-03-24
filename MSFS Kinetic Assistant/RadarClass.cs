@@ -419,8 +419,8 @@ namespace MSFS_Kinetic_Assistant
 
                                 circle.Width = thermalPosition.radius * 2 / scale;
                                 circle.Height = thermalPosition.radius * 2 / scale;
-                                SolidColorBrush strokeBrush = new SolidColorBrush(finalModifier > 0 ? Colors.Red : Colors.Blue);
-                                strokeBrush.Opacity = Math.Abs(finalModifier);
+                                SolidColorBrush strokeBrush = new SolidColorBrush(finalModifier >= 0 ? Colors.Red : Colors.Blue);
+                                strokeBrush.Opacity = Math.Abs(finalModifier >= 0 ? Math.Max(0.1, finalModifier) : Math.Min(-0.1, finalModifier));
                                 circle.Fill = strokeBrush;
                                 Canvas.SetLeft(circle, 125 - circle.Width / 2 + thermalDirection.groundDistance / scale * Math.Sin(thermalDirection.heading));
                                 Canvas.SetTop(circle, 125 - circle.Height / 2 - thermalDirection.groundDistance / scale * Math.Cos(thermalDirection.heading));
@@ -527,7 +527,7 @@ namespace MSFS_Kinetic_Assistant
                             {
                                 Line leg = (Line)el;
 
-                                SolidColorBrush strokeBrush = new SolidColorBrush(Colors.Yellow);
+                                SolidColorBrush strokeBrush = new SolidColorBrush(Color.FromArgb(255, 0, 170, 0));
                                 strokeBrush.Opacity = 0.5;
                                 leg.Stroke = strokeBrush;
 

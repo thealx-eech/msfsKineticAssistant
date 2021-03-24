@@ -27,7 +27,7 @@ namespace MSFS_Kinetic_Assistant
         //public string trackPlayingModel = "";
         //public GeoLocation trackPlayingCoords = null;
 
-        public KeyValuePair<uint,string> message = new KeyValuePair<uint, string>();
+        public KeyValuePair<uint, string> message = new KeyValuePair<uint, string>();
         public string lastMessage = "";
 
         public List<GhostPlane> ghostPlanes = new List<GhostPlane>();
@@ -50,7 +50,7 @@ namespace MSFS_Kinetic_Assistant
             double trackCaptureInterval = Math.Abs(_planeInfoResponse.AirspeedIndicated) > baseInterval ?
                 Math.Max(baseInterval, Math.Abs(_planeInfoResponse.AirspeedIndicated) / 30 - 1) :
                 baseInterval * 5;
-            
+
             if (absoluteTime - lastTrackCapture >= trackCaptureInterval)
             {
                 lastTrackCapture = absoluteTime;
@@ -131,7 +131,7 @@ namespace MSFS_Kinetic_Assistant
                 double longitudeOffset = 0;
                 double headingOffset = 0;
                 double altitudeOffset = 0;
-                GeoLocation root = new GeoLocation(0,0);
+                GeoLocation root = new GeoLocation(0, 0);
 
                 foreach (var trackPoint in trackpointsXml.Descendants("trkseg").First().Elements("trkpt"))
                 {
@@ -197,7 +197,7 @@ namespace MSFS_Kinetic_Assistant
                             Console.WriteLine("Offsets: lat" + latitudeOffset + " lon" + longitudeOffset + " head" + headingOffset + " alt" + altitudeOffset);
                         }
                         // CONTINUE OFFSETS
-                        if (ghostTeleport.alt != 0 && ghostPlane.TrackPoints.Count > 0)
+                        if (ghostTeleport.alt != 0 && ghostPlane.TrackPoints.Count > 0 && _mathClass.findDistanceBetweenPoints(ghostTeleport.location.Latitude, ghostTeleport.location.Longitude, root.Latitude, root.Longitude) > 100)
                         {
                             loc = _mathClass.RotatePointFrom(root, headingOffset * Math.PI / 180, loc);
                         }
@@ -296,7 +296,8 @@ namespace MSFS_Kinetic_Assistant
         public void playRecords(double absoluteTime)
         {
             int index;
-            while ((index = ghostPlanes.FindIndex(m => m.Progress == 0)) >= 0) {
+            while ((index = ghostPlanes.FindIndex(m => m.Progress == 0)) >= 0)
+            {
                 GhostPlane gp = ghostPlanes[index];
                 gp.Progress = 0.00001;
                 gp.LastTrackPlayed = absoluteTime;
@@ -361,7 +362,7 @@ namespace MSFS_Kinetic_Assistant
             {
             }
         }
-        public TowInfoPitch updateGhostPlayer(uint ID, NearbyInfoResponse response, TowInfoPitch towCommit, MathClass _mathClass, double absoluteTime)
+        public TowInfoPitch updateGhostPlayer(uint ID, NearbyInfoResponse response, TowInfoPitch towCommit, FsConnect _fsConnect, MathClass _mathClass, double absoluteTime)
         {
             int index = 0;
             double deltaTime = 0;
@@ -420,19 +421,9 @@ namespace MSFS_Kinetic_Assistant
                             if (bearing > Math.PI) { bearing -= 2 * Math.PI; }
                             else if (bearing < -Math.PI) { bearing += 2 * Math.PI; }
 
-                            /*if (towCommit.Heading - bearing < - Math.PI)
-                                bearing -= Math.PI;
-                            else if (towCommit.Heading - bearing > Math.PI)
-                                bearing += Math.PI;*/
-
-                            //towCommit.Pitch = 0.9 * towCommit.Pitch + 0.1 * (((1 - progress) * prev.Pitch + progress * curr.Pitch) / 2 * Math.PI / 180);
                             towCommit.Bank = /*0.9 * towCommit.Bank + 0.1 **/ (((1 - progress) * ((double)prev.Roll) + progress * ((double)curr.Roll)) / 2 * Math.PI / 180);
                             towCommit.Pitch = /*0.9 * towCommit.Bank + 0.1 **/ (((1 - progress) * ((double)prev.Pitch) + progress * ((double)curr.Pitch)) / 2 * Math.PI / 180);
-                            /*towCommit.Heading = _mathClass.findBearingToPoint(response.Latitude, response.Longitude, 
-                                ((1 - progress) * prev.Location.Latitude + progress * curr.Location.Latitude) / 2,
-                                ((1 - progress) * prev.Location.Longitude + progress * curr.Location.Longitude) / 2);*/
 
-                            //towCommit.Heading -= bearing * lastFrameTiming; //Math.Pow(Math.Abs(bearing) / Math.PI, 0.5);
                             double newHeading = towCommit.Heading + (absoluteTime - ghostPlane.LastTrackPlayed) * bearing;
                             newHeading %= 2 * Math.PI;
                             if (newHeading > Math.PI) { newHeading -= 2 * Math.PI; }
@@ -442,12 +433,35 @@ namespace MSFS_Kinetic_Assistant
                             towCommit.Heading = newHeading;
 
                             towCommit.VelocityBodyY = ((1 - progress) * (prev.Elevation - response.Altitude) + progress * (curr.Elevation - response.Altitude)) / 2;
-                            //towCommit.VelocityBodyZ = Math.Min(100, distanceCurr / timeLeft) * lastFrameTiming;
                             towCommit.VelocityBodyZ = (0.8 * curr.Velocity + 0.1 * distanceCurr / Math.Max(1, timeLeft)) * (Math.Abs(distanceCurr) < 10 ? Math.Abs(distanceCurr) / 10 : 1);
 
-                            if (towCommit.VelocityBodyZ < 0.01 && towCommit.VelocityBodyZ > -0.01)
+                            // TAXIING
+                            if (towCommit.VelocityBodyZ < 1 && towCommit.VelocityBodyZ > -1)
                             {
-                                towCommit.VelocityBodyZ = 0;
+                                towCommit.VelocityBodyZ = Math.Sign(towCommit.VelocityBodyZ) * Math.Pow(Math.Abs(towCommit.VelocityBodyZ), 4);
+                            }
+
+
+                            if (towCommit.VelocityBodyY > 10)
+                            {
+                                TowInfoResponse towInfo = new TowInfoResponse();
+                                towInfo.Altitude = response.Altitude + towCommit.VelocityBodyY;
+                                towInfo.Latitude = response.Latitude;
+                                towInfo.Longitude = response.Longitude;
+                                towInfo.Heading = response.Heading;
+                                towInfo.Bank = response.Bank;
+
+                                if (!double.IsNaN(towInfo.Altitude) && !double.IsNaN(towInfo.Latitude) && !double.IsNaN(towInfo.Longitude) && !double.IsNaN(towInfo.Heading) && !double.IsNaN(towInfo.Bank))
+                                {
+                                    try
+                                    {
+                                        Console.WriteLine("Sinking, TELEPORT!");
+                                        _fsConnect.UpdateData(Definitions.TowPlane, towInfo, ID);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                    }
+                                }
                             }
 
                             Console.WriteLine("Tracking animation " + (ghostPlane.Progress + deltaTime) + " h" + towCommit.VelocityBodyZ + " v" + towCommit.VelocityBodyY + " d" + distanceCurr);
@@ -466,7 +480,8 @@ namespace MSFS_Kinetic_Assistant
             }
 
 
-            if (index < ghostPlanes.Count) {
+            if (index < ghostPlanes.Count)
+            {
                 GhostPlane gp = ghostPlanes[index];
                 gp.LastTrackPlayed = absoluteTime;
                 gp.Progress += deltaTime;

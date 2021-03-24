@@ -25,6 +25,8 @@ namespace MSFS_Kinetic_Assistant
         public double AirspeedIndicated;
         public double VerticalSpeed;
         public double AmbientWindY;
+        public double TotalWeight;
+        public double SimRate;
 
         public double LIGHTPANEL;
         public double LIGHTSTROBE;
