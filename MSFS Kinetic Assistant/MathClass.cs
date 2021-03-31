@@ -188,7 +188,7 @@ namespace MSFS_Kinetic_Assistant
     }
     public class Waypoint
     {
-        public Waypoint(GeoLocation loc, string name, string entered, string passed, double weight, double wind)
+        public Waypoint(GeoLocation loc, string name, string entered, string passed, double weight, double wind, double altitude, double elevation, double height, double width, bool bottomMeasurement, bool topMeasurement)
         {
             Location = loc;
             Name = name;
@@ -196,6 +196,12 @@ namespace MSFS_Kinetic_Assistant
             Passed = passed;
             Weight = weight;
             Wind = wind;
+            Altitude = altitude;
+            Elevation = elevation;
+            Height = height;
+            Width = width;
+            BottomMeasurement = bottomMeasurement;
+            TopMeasurement = topMeasurement;
         }
 
         public GeoLocation Location { get; set; }
@@ -204,5 +210,11 @@ namespace MSFS_Kinetic_Assistant
         public string Passed { get; set; }
         public double Weight { get; set; }
         public double Wind { get; set; }
+        public double Altitude { get; set; }
+        public double Elevation { get; set; }
+        public double Height { get; set; }
+        public double Width { get; set; }
+        public bool BottomMeasurement { get; set; }
+        public bool TopMeasurement { get; set; }
     }
 }

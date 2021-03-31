@@ -32,6 +32,7 @@ namespace MSFS_Kinetic_Assistant
 
         public List<GhostPlane> ghostPlanes = new List<GhostPlane>();
         public winchPosition ghostTeleport = new winchPosition();
+        public List<string> competitiorsList = new List<string>();
 
         public short normalizeAngle(double rad)
         {
@@ -45,7 +46,7 @@ namespace MSFS_Kinetic_Assistant
             return deg;
         }
 
-        public void captureTrackPoint(PlaneInfoResponse _planeInfoResponse, PlaneInfoCommit _planeCommit, double absoluteTime, double baseInterval = 0.5)
+        public void captureTrackPoint(PlaneInfoResponse _planeInfoResponse, PlaneAvionicsResponse _planeAvionicsResponse, PlaneInfoCommit _planeCommit, double absoluteTime, double baseInterval = 0.5)
         {
             double trackCaptureInterval = Math.Abs(_planeInfoResponse.AirspeedIndicated) > baseInterval ?
                 Math.Max(baseInterval, Math.Abs(_planeInfoResponse.AirspeedIndicated) / 30 - 1) :
@@ -56,15 +57,15 @@ namespace MSFS_Kinetic_Assistant
                 lastTrackCapture = absoluteTime;
                 trackRecording.Add(new TrackPoint(new GeoLocation(_planeInfoResponse.Latitude, _planeInfoResponse.Longitude), _planeInfoResponse.Altitude, (int)_planeInfoResponse.AltitudeAboveGround,
                     _planeCommit.VelocityBodyZ, normalizeAngle(_planeInfoResponse.PlaneHeading), normalizeAngle(_planeInfoResponse.PlanePitch), normalizeAngle(_planeInfoResponse.PlaneBank),
-                    packLights(_planeInfoResponse), packAvionics(_planeInfoResponse), DateTime.UtcNow, recordingCounter));
+                    packLights(_planeAvionicsResponse), packAvionics(_planeAvionicsResponse), DateTime.UtcNow, recordingCounter));
 
                 Console.WriteLine("Track capture: " + recordingCounter);
             }
         }
 
-        public KeyValuePair<double, string> buildTrackFile(string appName, string nickName, PlaneInfoResponse _planeInfoResponse, MathClass _mathClass, string filename, bool timeAligned = false)
+        public KeyValuePair<double, string> buildTrackFile(string appName, string nickName, PlaneInfoResponse _planeInfoResponse, PlaneAvionicsResponse _planeAvionicsResponse, MathClass _mathClass, string filename, bool timeAligned = false)
         {
-            string str = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><gpx creator=\"" + appName + "\" version=\"1.0\"><trk><name>" + _planeInfoResponse.Title + " - " + nickName + "</name><desc></desc><trkseg>";
+            string str = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><gpx creator=\"" + appName + "\" version=\"1.0\"><trk><name>" + _planeAvionicsResponse.Title + " - " + nickName + "</name><desc></desc><trkseg>";
             TrackPoint prev = new TrackPoint(new GeoLocation(0, 0), 0, 0, 0, 0, 0, 0, 0, 0, DateTime.Now, 0);
             double distance = 0;
 
@@ -78,17 +79,17 @@ namespace MSFS_Kinetic_Assistant
 
                 DateTime timestamp = !timeAligned ? trackPoint.Time : (new DateTime(2000, 1, 1)).AddSeconds(trackPoint.Timer);
 
-                str += "<trkpt lon=\"" + (trackPoint.Location.Longitude * 180 / Math.PI).ToString(CultureInfo.InvariantCulture) + "\" lat=\"" + (trackPoint.Location.Latitude * 180 / Math.PI).ToString(CultureInfo.InvariantCulture) + "\">" +
-                    "<ele>" + trackPoint.Elevation.ToString(CultureInfo.InvariantCulture) + "</ele>" +
-                    "<agl>" + trackPoint.AltitudeAboveGround.ToString() + "</agl>" +
-                    "<velocity>" + trackPoint.Velocity.ToString(CultureInfo.InvariantCulture) + "</velocity>" +
-                    "<heading>" + trackPoint.Heading + "</heading>" +
-                    "<pitch>" + trackPoint.Pitch + "</pitch>" +
-                    "<roll>" + trackPoint.Roll + "</roll>" +
-                    "<lights>" + trackPoint.Lights.ToString() + "</lights>" +
-                    "<avionics>" + trackPoint.Avionics.ToString() + "</avionics>" +
-                    "<time>" + timestamp.ToString("O") + "Z" + "</time>" +
-                "</trkpt>";
+                str += Environment.NewLine + "<trkpt lon=\"" + (trackPoint.Location.Longitude * 180 / Math.PI).ToString(CultureInfo.InvariantCulture) + "\" lat=\"" + (trackPoint.Location.Latitude * 180 / Math.PI).ToString(CultureInfo.InvariantCulture) + "\">" +
+                    Environment.NewLine + " <ele>" + trackPoint.Elevation.ToString(CultureInfo.InvariantCulture) + "</ele>" +
+                    Environment.NewLine + " <agl>" + trackPoint.AltitudeAboveGround.ToString() + "</agl>" +
+                    Environment.NewLine + " <velocity>" + trackPoint.Velocity.ToString(CultureInfo.InvariantCulture) + "</velocity>" +
+                    Environment.NewLine + " <heading>" + trackPoint.Heading + "</heading>" +
+                    Environment.NewLine + " <pitch>" + trackPoint.Pitch + "</pitch>" +
+                    Environment.NewLine + " <roll>" + trackPoint.Roll + "</roll>" +
+                    Environment.NewLine + " <lights>" + trackPoint.Lights.ToString() + "</lights>" +
+                    Environment.NewLine + " <avionics>" + trackPoint.Avionics.ToString() + "</avionics>" +
+                    Environment.NewLine + " <time>" + timestamp.ToString("O") + "Z" + "</time>" +
+                Environment.NewLine + "</trkpt>";
 
                 prev = trackPoint;
             }
@@ -117,11 +118,14 @@ namespace MSFS_Kinetic_Assistant
 
                 if (trackpointsXml.Descendants("name").First() != null)
                 {
-                    ghostPlane.Name = trackpointsXml.Descendants("name").First().Value.Split(new string[] { " - " }, StringSplitOptions.None)[0].Trim();
+                    string[] title = trackpointsXml.Descendants("name").First().Value.Split(new string[] { " - " }, StringSplitOptions.None);
+                    ghostPlane.Name = title[0].Trim();
+                    ghostPlane.Username = title.Length > 1 ? title[1] : "";
                 }
                 else
                 {
                     ghostPlane.Name = "DA40-NG Asobo";
+                    ghostPlane.Username = "";
                 }
 
                 double counter = 0;
@@ -239,22 +243,22 @@ namespace MSFS_Kinetic_Assistant
             return ghostPlane;
         }
 
-        public int packLights(PlaneInfoResponse _planeInfoResponse)
+        public int packLights(PlaneAvionicsResponse _planeAvionicsResponse)
         {
             bool[] myBools = new bool[] {
-                _planeInfoResponse.LIGHTBEACON == 100,
-                _planeInfoResponse.LIGHTCABIN == 100,
-                _planeInfoResponse.LIGHTGLARESHIELD == 100,
-                _planeInfoResponse.LIGHTLANDING == 100,
-                _planeInfoResponse.LIGHTLOGO == 100,
-                _planeInfoResponse.LIGHTNAV == 100,
-                _planeInfoResponse.LIGHTPANEL == 100,
-                _planeInfoResponse.LIGHTPEDESTRAL == 100,
-                _planeInfoResponse.LIGHTPOTENTIOMETER == 100,
-                _planeInfoResponse.LIGHTRECOGNITION == 100,
-                _planeInfoResponse.LIGHTSTROBE == 100,
-                _planeInfoResponse.LIGHTTAXI == 100,
-                _planeInfoResponse.LIGHTWING == 100,
+                _planeAvionicsResponse.LIGHTBEACON == 100,
+                _planeAvionicsResponse.LIGHTCABIN == 100,
+                _planeAvionicsResponse.LIGHTGLARESHIELD == 100,
+                _planeAvionicsResponse.LIGHTLANDING == 100,
+                _planeAvionicsResponse.LIGHTLOGO == 100,
+                _planeAvionicsResponse.LIGHTNAV == 100,
+                _planeAvionicsResponse.LIGHTPANEL == 100,
+                _planeAvionicsResponse.LIGHTPEDESTRAL == 100,
+                _planeAvionicsResponse.LIGHTPOTENTIOMETER == 100,
+                _planeAvionicsResponse.LIGHTRECOGNITION == 100,
+                _planeAvionicsResponse.LIGHTSTROBE == 100,
+                _planeAvionicsResponse.LIGHTTAXI == 100,
+                _planeAvionicsResponse.LIGHTWING == 100,
             };
 
             byte[] byteArray = myBools.Select(b => (byte)(b ? 1 : 0)).ToArray();
@@ -262,7 +266,7 @@ namespace MSFS_Kinetic_Assistant
 
             return lights;
         }
-        public int packAvionics(PlaneInfoResponse _planeInfoResponse)
+        public int packAvionics(PlaneAvionicsResponse _planeAvionicsResponse)
         {
             return 0;
         }
@@ -292,6 +296,19 @@ namespace MSFS_Kinetic_Assistant
             }
 
             return new GhostPlane();
+        }
+        public string possiblyGetPlaneName(uint ID, string name)
+        {
+            if (ghostPlanes.Count > 0 && ID > 1)
+            {
+                GhostPlane gp = getGhostPlane(ID);
+                if (!string.IsNullOrEmpty(gp.Username))
+                {
+                    return gp.Username;
+                }
+            }
+
+            return name;
         }
         public void playRecords(double absoluteTime)
         {
@@ -515,9 +532,10 @@ namespace MSFS_Kinetic_Assistant
 
     public struct GhostPlane
     {
-        public GhostPlane(string name, uint id, double length, double progress, double lastTrackPlayed, List<TrackPoint> trackPoints)
+        public GhostPlane(string name, string username, uint id, double length, double progress, double lastTrackPlayed, List<TrackPoint> trackPoints)
         {
             Name = name;
+            Username = username;
             ID = id;
             Length = length;
             Progress = progress;
@@ -525,6 +543,7 @@ namespace MSFS_Kinetic_Assistant
             TrackPoints = trackPoints;
         }
         public string Name;
+        public string Username;
         public uint ID;
         public double Length;
         public double Progress;

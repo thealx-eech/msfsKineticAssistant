@@ -255,7 +255,7 @@
                     <Slider Style="{StaticResource Horizontal_Slider}"  Margin="0, -15, 0, -3" ValueChanged="saveSettings" ToolTip="SimConnect requests per second" Name="RequestsFrequency" IsSnapToTickEnabled="True" TickFrequency="1" Minimum="10" Maximum="18" Value="18" AutoToolTipPlacement="TopLeft"  AutoToolTipPrecision="0" ></Slider>
                     <Button x:Name="connectButton" Height="26px" Background="#55FFFFFF" Foreground="DarkGreen" BorderBrush="DarkGreen" Click="toggleConnect" VerticalAlignment="Top">CONNECT</Button>
                 </StackPanel>
-                <TabControl VerticalAlignment="Stretch" Height="326px" TabStripPlacement="Right" Background="Transparent">
+                <TabControl VerticalAlignment="Stretch" TabStripPlacement="Right" Background="Transparent">
                     <TabItem Header="Winch" Height="46"  Background="Transparent">
                         <StackPanel MinWidth="211" Margin="-2 -2 -2 -1" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
                             <StackPanel.Background>
@@ -454,7 +454,7 @@
                                 </StackPanel>
 
                                 <StackPanel Margin="0, 10, 5, 0" Grid.Column="1">
-                                    <Button ToolTip="EXPERIMENTAL! Realistic procedures are not recommended" IsEnabled="false" Height="26px" x:Name="towInsertButton" Background="#55FFFFFF" Click="aiTowPlane" Foreground="DarkRed" BorderBrush="DarkRed" Margin="0, 0, 0, 0"  VerticalAlignment="Top">AI TOW</Button>
+                                    <Button ToolTip="EXPERIMENTAL! ATC mode for tow plane is not recommended" IsEnabled="false" Height="26px" x:Name="towInsertButton" Background="#55FFFFFF" Click="aiTowPlane" Foreground="DarkRed" BorderBrush="DarkRed" Margin="0, 0, 0, 0"  VerticalAlignment="Top">AI TOW</Button>
                                 </StackPanel>
                             </Grid>
 

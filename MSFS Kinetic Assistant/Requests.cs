@@ -17,6 +17,8 @@
         SimStart = 12,
         SimStop = 13,
         WeatherData = 14,
+        PlaneAvionics = 15,
+        PlaneLift = 16,
     }
 
     public enum Definitions
@@ -36,5 +38,7 @@
         SimStart = 12,
         SimStop = 13,
         WeatherData = 14,
+        PlaneAvionics = 15,
+        PlaneLift = 16,
     }
 }

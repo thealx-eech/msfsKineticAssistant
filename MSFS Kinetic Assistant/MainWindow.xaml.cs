@@ -36,12 +36,19 @@ namespace MSFS_Kinetic_Assistant
         string zipDirectory = "";
 
         private FsConnect _fsConnect;
+
         private PlaneInfoResponse _planeInfoResponse;
         private PlaneInfoResponse _planeInfoResponseLast;
+
+        private PlaneAvionicsResponse _planeAvionicsResponse;
+        private PlaneAvionicsResponse _planeAvionicsResponseLast;
+
         private PlaneInfoCommit _planeCommit;
         private PlaneInfoCommit _planeCommitLast;
+
         private PlaneInfoRotate _planeRotate;
         private PlaneEngineData _planeEngineData;
+
         private Dictionary<uint, winchPosition> _nearbyInfoResponse;
         private Dictionary<uint, winchPosition> _nearbyInfoResponseLast;
         private Dictionary<uint, winchPosition> _nearbyInfoResponsePreLast;
@@ -114,11 +121,13 @@ namespace MSFS_Kinetic_Assistant
         bool launchpadAbortInitiated = false;
         bool arrestorsAbortInitiated = false;
 
-        private double absoluteTime;
-        private double swLast;
+        private double absoluteTime = 0;
+        private double swCurrent = 0;
+        private double swLast = 0;
         private double lastFrameTiming;
         DispatcherTimer dispatcherTimer;
         DispatcherTimer launchTimer;
+        DispatcherTimer nearbyTimer;
         private double lastPreparePressed = 0;
 
         string optPath;
@@ -142,8 +151,8 @@ namespace MSFS_Kinetic_Assistant
         // RADAR
 #if DEBUG
         double allowedRadarScale = 5;
-        double allowedRecords = 3;
-        double allowedRecordLength = 600; // SEC
+        double allowedRecords = 5;
+        double allowedRecordLength = 900; // SEC
 #else
         double allowedRadarScale = 50;
         double allowedRecords = 999;
@@ -162,7 +171,7 @@ namespace MSFS_Kinetic_Assistant
 
             // PREPARE CONTROLS DATA
             controlTimestamps = new Dictionary<string, double>();
-            foreach (var field in typeof(PlaneInfoResponse).GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public))
+            foreach (var field in typeof(PlaneAvionicsResponse).GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public))
                 if (field.FieldType == typeof(double))
                     controlTimestamps.Add(field.Name, 0);
 
@@ -213,10 +222,10 @@ namespace MSFS_Kinetic_Assistant
             launchTimer.Tick += new EventHandler(launchInterval);
             launchTimer.Start();
 
-            dispatcherTimer = new DispatcherTimer();
-            dispatcherTimer.Interval = new TimeSpan(0, 0, 0, 1);
-            dispatcherTimer.Tick += new EventHandler(nearbyInterval);
-            dispatcherTimer.Start();
+            nearbyTimer = new DispatcherTimer();
+            nearbyTimer.Interval = new TimeSpan(0, 0, 0, 0, 20000 / Math.Max(10, (int)(assistantSettings.ContainsKey("RequestsFrequency") ? assistantSettings["RequestsFrequency"] : 10)));
+            nearbyTimer.Tick += new EventHandler(nearbyInterval);
+            nearbyTimer.Start();
 
             dispatcherTimer = new DispatcherTimer();
             dispatcherTimer.Interval = new TimeSpan(0, 0, 0, 10, 33);
@@ -237,6 +246,8 @@ namespace MSFS_Kinetic_Assistant
         {
             if (validConnection())
             {
+                _fsConnect.RequestData(Requests.PlaneAvionics, Definitions.PlaneAvionics);
+
                 if (_winchPosition == null && _carrierPosition == null && targedCatapultVelocity == 0 && !thermalsWorking && towingTarget == TARGETMAX && !taskInProcess)
                 {
                     _fsConnect.RequestData(Requests.PlaneInfo, Definitions.PlaneInfo);
@@ -338,7 +349,7 @@ namespace MSFS_Kinetic_Assistant
             }
             else
             {
-                Application.Current.Dispatcher.Invoke(() => _radarClass.ClearRadar(RadarCanvas));
+                //Application.Current.Dispatcher.Invoke(() => _radarClass.ClearRadar(RadarCanvas));
 
                 if (towScanMode > TowScanMode.Disabled)
                 {
@@ -354,7 +365,6 @@ namespace MSFS_Kinetic_Assistant
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine(ex.Message);
                     addLogMessage(ex.Message, 2);
                 }
 
@@ -384,7 +394,7 @@ namespace MSFS_Kinetic_Assistant
 
         private bool restrictionsPassed()
         {
-            if (assistantSettings["realisticRestrictions"] == 0 || _planeInfoResponse.SimOnGround == 100 || _planeInfoResponse.AltitudeAboveGround <= _planeInfoResponse.StaticCGtoGround * 1.25)
+            if (assistantSettings["realisticRestrictions"] == 0 || _planeAvionicsResponse.SimOnGround == 100 || _planeInfoResponse.AltitudeAboveGround <= _planeAvionicsResponse.StaticCGtoGround * 1.25)
                 return true;
 
             return false;
@@ -405,7 +415,7 @@ namespace MSFS_Kinetic_Assistant
             {
                 if (_winchPosition == null) // PREPARE TO LAUNCH
                 {
-                    if (_planeInfoResponse.BrakeParkingPosition == 100 && restrictionsPassed())
+                    if (_planeAvionicsResponse.BrakeParkingPosition == 100 && restrictionsPassed())
                     {
                         lastPreparePressed = absoluteTime;
                         addLogMessage("Creating winch");
@@ -526,7 +536,7 @@ namespace MSFS_Kinetic_Assistant
                 }
 
                 // LEVEL UP GLIDER BEFORE LAUNCH
-                if (_planeInfoResponse.SimOnGround == 100 && launchTime != 0 && _planeInfoResponse.AirspeedIndicated < 5)
+                if (_planeAvionicsResponse.SimOnGround == 100 && launchTime != 0 && _planeInfoResponse.AirspeedIndicated < 5)
                 {
                     levelUpGlider();
                 }
@@ -611,7 +621,7 @@ namespace MSFS_Kinetic_Assistant
 
             Console.WriteLine($"{type}: {bodyAcceleration / 9.81:F2}g {(type == "Winch" ? cableLength : towCableLength):F2}m / {_winchDirection.distance:F2}m h{(_winchDirection.heading * 180 / Math.PI):F0}deg p{(_winchDirection.pitch * 180 / Math.PI):F0}deg");
 
-            double angleHLimit = (_planeInfoResponse.SimOnGround == 0 ? 89 : 179) * Math.PI / 180;
+            double angleHLimit = (_planeAvionicsResponse.SimOnGround == 0 ? 89 : 179) * Math.PI / 180;
             double angleVLimit = 69 * Math.PI / 180;
 
             // WHAT IS THIS? SKIP!
@@ -648,8 +658,8 @@ namespace MSFS_Kinetic_Assistant
                 _mathClass.restrictAirspeed(_planeCommit.VelocityBodyZ, targetVelocity, lastFrameTiming);
 
                 // PROCESS NOSE CONNECTION POINT
-                double degreeThershold = (_planeInfoResponse.SimOnGround == 0 ? 20 : 1) * Math.PI / 180;
-                double accelThreshold = 9.81 / (_planeInfoResponse.SimOnGround == 0 ? 5 : 1000);
+                double degreeThershold = (_planeAvionicsResponse.SimOnGround == 0 ? 20 : 1) * Math.PI / 180;
+                double accelThreshold = 9.81 / (_planeAvionicsResponse.SimOnGround == 0 ? 5 : 1000);
 
                 if (bodyAcceleration > accelThreshold && connectionPoint != 0 && (Math.Abs(_winchDirection.pitch) > degreeThershold || Math.Abs(_winchDirection.heading) > degreeThershold))
                 {
@@ -662,7 +672,7 @@ namespace MSFS_Kinetic_Assistant
                     //Console.WriteLine("_planeRotate.RotationVelocityBodyX:" + _planeRotate.RotationVelocityBodyX + " rotationForce:" + rotationForce + " rotationForce:" + rotationForce + " sinPitch:" + sinPitch + " lastFrameTiming:" + lastFrameTiming);
 
                     _planeRotate.RotationVelocityBodyX = (_planeRotate.RotationVelocityBodyX - rotationForce * sinPitch) * lastFrameTiming;
-                    _planeRotate.RotationVelocityBodyY = (_planeRotate.RotationVelocityBodyY + (_planeInfoResponse.SimOnGround == 0 ? rotationForce : 10 * Math.Pow(Math.Abs(rotationForce / 10), 0.1)) * sinHeading)
+                    _planeRotate.RotationVelocityBodyY = (_planeRotate.RotationVelocityBodyY + (_planeAvionicsResponse.SimOnGround == 0 ? rotationForce : 10 * Math.Pow(Math.Abs(rotationForce / 10), 0.1)) * sinHeading)
                         * lastFrameTiming;
                     _planeRotate.RotationVelocityBodyZ = (_planeRotate.RotationVelocityBodyZ + lastFrameTiming * rotationForce * sinHeading) * lastFrameTiming;
 
@@ -746,7 +756,7 @@ namespace MSFS_Kinetic_Assistant
                 if (restrictionsPassed())
                 {
                     // ATC 
-                    if (assistantSettings["realisticTowProcedures"] != 0)
+                    if (assistantSettings.ContainsKey("realisticTowProcedures") && assistantSettings["realisticTowProcedures"] != 0)
                     {
                         if (File.Exists(optPath + @"MISSIONS\Custom\CustomFlight\CUSTOMFLIGHT.PLN"))
                         {
@@ -782,7 +792,8 @@ namespace MSFS_Kinetic_Assistant
                         string trackName = ((ComboBoxItem)(towPlaneTrack.SelectedItem)).Tag.ToString();
                         if (!string.IsNullOrEmpty(trackName) && File.Exists(trackName))
                         {
-                            beforeLoadTrackRecord(true);
+                            ClearRecords(null, null);
+                            beforeLoadTrackRecord(1);
                             loadTrackRecord(trackName, true);
                             towPlaneInserted = true;
                         }
@@ -847,7 +858,7 @@ namespace MSFS_Kinetic_Assistant
 
             Console.WriteLine("assignTowPlane in " + direction.distance + "m");
 
-            if (assistantSettings["realisticTowProcedures"] == 0)
+            if (!assistantSettings.ContainsKey("realisticTowProcedures") || assistantSettings["realisticTowProcedures"] == 0)
             {
                 //towSearchRadius.Text = menuValue.ToString(".0");
                 towCableDesired *= 2;
@@ -1019,8 +1030,9 @@ namespace MSFS_Kinetic_Assistant
                             label.FontSize = 10;
                             label.Background = new SolidColorBrush(Colors.Transparent);
 
-                            string title = obj.Value.category + " " + obj.Value.title.Replace("_", " ");
-                            label.Content = (obj.Key + " " + title).Substring(0, Math.Min(title.Length, 40)) + " (" + dir.distance.ToString(".0m") + ")";
+                            string title = _trackingClass.possiblyGetPlaneName(obj.Key, obj.Value.title.Replace("_", " "));
+                            Console.WriteLine("title: " + title);
+                            label.Content = title + " (" + dir.distance.ToString(".0m") + ")";
 
                             // AVAILABLE OBJECTS + CURRENT TARGET
                             if (dir.distance <= 1000 * Math.Min(allowedRadarScale, assistantSettings["RadarScale"]) || obj.Key == towingTarget)
@@ -1084,7 +1096,7 @@ namespace MSFS_Kinetic_Assistant
                         // AI TOW NOT FOUND - INSERT NEW ONE
                         if (_planeInfoResponse.AbsoluteTime - insertTowPlanePressed > 2 && towScanMode == TowScanMode.TowInsert)
                         {
-                            if (assistantSettings["realisticTowProcedures"] == 0 || plnPath != "")
+                            if ((!assistantSettings.ContainsKey("realisticTowProcedures") || assistantSettings["realisticTowProcedures"] == 0) || plnPath != "")
                             {
                                 //createFlightPlan();
                                 insertTowPlane();
@@ -1240,17 +1252,17 @@ namespace MSFS_Kinetic_Assistant
                 winchDirection winchDirection = _mathClass.getForceDirection(winchPosition, _planeInfoResponse);
 
                 // SET DESIRED ROPE LENGTH
-                towCableDesired = Math.Max(assistantSettings["realisticTowProcedures"] == 0 || _planeInfoResponse.SimOnGround != 100 || _planeInfoResponse.OnAnyRunway == 100 ? 80 : 40, winchPosition.airspeed);
+                towCableDesired = Math.Max((!assistantSettings.ContainsKey("realisticTowProcedures") || assistantSettings["realisticTowProcedures"] == 0) || _planeAvionicsResponse.SimOnGround != 100 || _planeAvionicsResponse.OnAnyRunway == 100 ? 80 : 40, winchPosition.airspeed);
 
                 // LEVEL UP GLIDER BEFORE LAUNCH
-                if (_planeInfoResponse.SimOnGround == 100 && _planeInfoResponse.AirspeedIndicated < 5)
+                if (_planeAvionicsResponse.SimOnGround == 100 && _planeInfoResponse.AirspeedIndicated < 5)
                 {
                     levelUpGlider();
                 }
 
                 // GET FINAL CABLE TENSION
                 double accelerationLimit = (assistantSettings["realisticFailures"] == 1 ? 8 : 40) * 9.81;
-                if (_planeInfoResponse.SimOnGround == 100)
+                if (_planeAvionicsResponse.SimOnGround == 100)
                 {
                     accelerationLimit /= 2;
                 }
@@ -1297,7 +1309,7 @@ namespace MSFS_Kinetic_Assistant
             {
                 if (targedCatapultVelocity == 0) // PREPARE TO LAUNCH
                 {
-                    if (_planeInfoResponse.BrakeParkingPosition == 100 && (_planeInfoResponse.SimOnGround == 100 || _planeInfoResponse.AltitudeAboveGround <= _planeInfoResponse.StaticCGtoGround * 1.25))
+                    if (_planeAvionicsResponse.BrakeParkingPosition == 100 && (_planeAvionicsResponse.SimOnGround == 100 || _planeInfoResponse.AltitudeAboveGround <= _planeAvionicsResponse.StaticCGtoGround * 1.25))
                     {
                         targedCatapultVelocity = 0.9 * 0.514 * assistantSettings["catapultTargetSpeed"];
                         showMessage("Launchpad connected - disengage parking brakes to launch", _fsConnect);
@@ -1342,7 +1354,7 @@ namespace MSFS_Kinetic_Assistant
                 targedCatapultVelocity = 0;
                 launchpadAbortInitiated = false;
             }
-            else if (_planeInfoResponse.BrakeParkingPosition == 0)
+            else if (_planeAvionicsResponse.BrakeParkingPosition == 0)
             {
                 // ANIMATE LAUNCHPAD
                 if (_planeCommit.LaunchbarPosition != 100) { _planeCommit.LaunchbarPosition = 100; }
@@ -1354,7 +1366,7 @@ namespace MSFS_Kinetic_Assistant
                     targedCatapultVelocity -= diff;
                     _planeCommit.VelocityBodyZ += diff;
 
-                    if (_planeCommit.VelocityBodyZ >= 0.9 * 0.514 * assistantSettings["catapultTargetSpeed"] || _planeInfoResponse.SimOnGround != 100)
+                    if (_planeCommit.VelocityBodyZ >= 0.9 * 0.514 * assistantSettings["catapultTargetSpeed"] || _planeAvionicsResponse.SimOnGround != 100)
                         abortLaunchpad();
 
                     Console.WriteLine("Launchpad acceleration: " + diff / lastFrameTiming);
@@ -1440,9 +1452,9 @@ namespace MSFS_Kinetic_Assistant
 
                 // SET CONTACT POINT
                 if (_planeCommit.VelocityBodyZ > 20 && _carrierPosition.alt == 0 && _planeCommit.TailhookPosition == 100 &&
-                    (_planeInfoResponse.SimOnGround == 100 || _planeInfoResponse.AltitudeAboveGround <= _planeInfoResponse.StaticCGtoGround * 1.25))
+                    (_planeAvionicsResponse.SimOnGround == 100 || _planeInfoResponse.AltitudeAboveGround <= _planeAvionicsResponse.StaticCGtoGround * 1.25))
                 {
-                    _carrierPosition.alt = _planeInfoResponse.Altitude - _planeInfoResponse.StaticCGtoGround;
+                    _carrierPosition.alt = _planeInfoResponse.Altitude - _planeAvionicsResponse.StaticCGtoGround;
                     _carrierPosition.location = new GeoLocation(_planeInfoResponseLast.Latitude, _planeInfoResponseLast.Longitude);
                     arrestorConnectedTime = absoluteTime;
 
@@ -1943,8 +1955,9 @@ namespace MSFS_Kinetic_Assistant
 
                         double pitchBankModifier = Math.Abs(Math.Cos(_planeInfoResponse.PlaneBank)) * Math.Abs(Math.Cos(_planeInfoResponse.PlanePitch)); // ROTATION
 
-                        double airspeedModifier = _planeInfoResponse.AirspeedIndicated < 100 ? Math.Pow(Math.Max(0, 1 - _planeInfoResponse.AirspeedIndicated / 100), 0.15) : 0; // OVERSPEED
-                        airspeedModifier *= _planeInfoResponse.AirspeedIndicated > 20 ? Math.Pow(Math.Max(0, (_planeInfoResponse.AirspeedIndicated - 20) / 80), 0.15) : 0; // STALL
+                        double airspeedModifier = Math.Pow(Math.Max(0, 1 - _planeInfoResponse.AirspeedIndicated / 100), 0.5); // OVERSPEED
+                        airspeedModifier *= Math.Pow(Math.Max(0, _planeInfoResponse.AirspeedIndicated / 100), 0.5); // STALL
+                        airspeedModifier *= 3;
 
                         double ambientModifier = (1 - windModifier) * overcastModifier * dayTimeModifier;
 
@@ -1977,7 +1990,7 @@ namespace MSFS_Kinetic_Assistant
                             //_planeCommit.VelocityBodyZ -= _thermalDirection.localForceDirection.Z * liftAmount * lastFrameTiming;
 
                             // FORWARD SPEED COMPENSATION
-                            double rateModifier = assistantSettings.ContainsKey("RequestsFrequency") ? assistantSettings["RequestsFrequency"] / 18 : 1;
+                            double rateModifier = assistantSettings.ContainsKey("RequestsFrequency") ? Math.Pow(assistantSettings["RequestsFrequency"] / 18, 0.5) : 1;
                             _planeCommit.VelocityBodyZ += _planeCommit.VelocityBodyZ * Math.Pow(Math.Abs(lastFrameTiming), 2.5) * horizontalModifier * verticalModifier * airspeedModifier * rateModifier;
 
                             if (!double.IsNaN(_planeCommit.VelocityBodyX) && !double.IsNaN(_planeCommit.VelocityBodyY) && !double.IsNaN(_planeCommit.VelocityBodyZ))
@@ -2016,16 +2029,12 @@ namespace MSFS_Kinetic_Assistant
             {
                 try
                 {
-                    // COMMON DATA
+                    // PLANE INFO
                     if (e.RequestId == (uint)Requests.PlaneInfo)
                     {
                         //Console.WriteLine(JsonConvert.SerializeObject(e.Data, Formatting.Indented));
                         _planeInfoResponseLast = _planeInfoResponse;
                         _planeInfoResponse = (PlaneInfoResponse)(e.Data);
-
-                        absoluteTime = _planeInfoResponse.AbsoluteTime;
-
-                        trackControlChanges();
 
                         Application.Current.Dispatcher.Invoke(() => VerticalWindPos.Height = 125 - Math.Min(Math.Max(0, (_planeInfoResponse.AmbientWindY + thermalFlow) * 1.94) * 6.25, 125));
                         Application.Current.Dispatcher.Invoke(() => VerticalWindNeg.Height = 125 - Math.Min(Math.Abs(Math.Min(0, (_planeInfoResponse.AmbientWindY + thermalFlow) * 1.94) * 6.25), 125));
@@ -2053,6 +2062,15 @@ namespace MSFS_Kinetic_Assistant
                         if (thermalsDebugActive > 0)
                             Application.Current.Dispatcher.Invoke(() => _radarClass.updateCompassWind(RadarCanvas, _planeInfoResponse.PlaneHeading, _weatherReport.AmbientWindDirection, _weatherReport.AmbientWindVelocity * 1.94384));
                     }
+                    // PLANE AVIONICS
+                    else if (e.RequestId == (uint)Requests.PlaneAvionics)
+                    {
+                        //Console.WriteLine(JsonConvert.SerializeObject(e.Data, Formatting.Indented));
+                        _planeAvionicsResponseLast = _planeAvionicsResponse;
+                        _planeAvionicsResponse = (PlaneAvionicsResponse)(e.Data);
+
+                        trackControlChanges();
+                    }
                     // LAUNCH DATA
                     else if (e.RequestId == (uint)Requests.PlaneCommit)
                     {
@@ -2060,10 +2078,10 @@ namespace MSFS_Kinetic_Assistant
                         _planeCommitLast = _planeCommit;
                         _planeCommit = (PlaneInfoCommit)e.Data;
 
-                        absoluteTime = _planeCommit.AbsoluteTime;
+                        swCurrent = _planeCommit.AbsoluteTime;
 
                         // PAUSE?
-                        if (_planeInfoResponse.SimOnGround != 100 &&
+                        if (_planeAvionicsResponse.SimOnGround != 100 &&
                             (_planeInfoResponse.AirspeedIndicated == _planeInfoResponseLast.AirspeedIndicated &&
                             _planeInfoResponse.GpsGroundSpeed == _planeInfoResponseLast.GpsGroundSpeed &&
                             _planeInfoResponse.Altitude == _planeInfoResponseLast.Altitude &&
@@ -2074,10 +2092,12 @@ namespace MSFS_Kinetic_Assistant
                         }
                         else
                         {
-                            lastFrameTiming = absoluteTime - swLast;
+                            lastFrameTiming = swCurrent - swLast;
                         }
 
-                        if (lastFrameTiming > 0.001 && lastFrameTiming <= 10.0 && _planeInfoResponse.IsSlewActive != 100)
+                        absoluteTime += lastFrameTiming;
+
+                        if (lastFrameTiming > 0.001 && lastFrameTiming <= 10.0 && _planeAvionicsResponse.IsSlewActive != 100)
                         {
                             // TRACK RECORDING
                             if (_trackingClass.trackRecording != null && _trackingClass.recordingCounter > 0)
@@ -2089,13 +2109,13 @@ namespace MSFS_Kinetic_Assistant
                                 }
                                 else
                                 {
-                                    _trackingClass.captureTrackPoint(_planeInfoResponse, _planeCommit, absoluteTime, 0.5);
+                                    _trackingClass.captureTrackPoint(_planeInfoResponse, _planeAvionicsResponse, _planeCommit, absoluteTime, 0.5);
                                     _trackingClass.recordingCounter += lastFrameTiming;
                                 }
                             }
 
                             // CHECK WINCH LAUNCH STANDBY
-                            if (_planeInfoResponse.BrakeParkingPosition == 0 && _winchPosition != null && launchTime == 0)
+                            if (_planeAvionicsResponse.BrakeParkingPosition == 0 && _winchPosition != null && launchTime == 0)
                             {
                                 initiateLaunch(new object(), new RoutedEventArgs());
                             }
@@ -2127,8 +2147,12 @@ namespace MSFS_Kinetic_Assistant
                                 }
                             }
                         }
+                        else
+                        {
+                            Console.WriteLine("Frame skip, lastFrameTiming: " + lastFrameTiming);
+                        }
 
-                        swLast = absoluteTime;
+                        swLast = swCurrent;
                     }
                     // ROTATION DATA
                     else if (e.RequestId == (uint)Requests.PlaneRotate)
@@ -2203,7 +2227,7 @@ namespace MSFS_Kinetic_Assistant
                         }
                         else if (response.FlightNumber == "9999" || insertedTowPlane.Key == e.ObjectID)
                         {
-                            bool AIhold = assistantSettings["realisticTowProcedures"] == 0 && insertTowPlanePressed != 0 && _planeInfoResponse.AbsoluteTime - insertTowPlanePressed < AIholdInterval;
+                            bool AIhold = (!assistantSettings.ContainsKey("realisticTowProcedures") || assistantSettings["realisticTowProcedures"] == 0) && insertTowPlanePressed != 0 && _planeInfoResponse.AbsoluteTime - insertTowPlanePressed < AIholdInterval;
                             // HOLD INSERTED PLANE FOR A WHILE
                             if (AIhold)
                             {
@@ -2254,7 +2278,7 @@ namespace MSFS_Kinetic_Assistant
                             }
                             // CONTROL ALTITUDE of AI TOW PLANE
                             else if (insertedTowPlane.Key == e.ObjectID && towingTarget == e.ObjectID &&
-                                (assistantSettings["realisticTowProcedures"] == 0 || response.Airspeed > assistantSettings["aiSpeed"] / 1.96))
+                                ((!assistantSettings.ContainsKey("realisticTowProcedures") || assistantSettings["realisticTowProcedures"] == 0) || response.Airspeed > assistantSettings["aiSpeed"] / 1.96))
                             {
                                 TowInfoPitch towCommit = new TowInfoPitch();
                                 towCommit.Bank = response.Bank;
@@ -2263,7 +2287,7 @@ namespace MSFS_Kinetic_Assistant
                                 towCommit.VelocityBodyZ = response.Airspeed;
                                 towCommit.VelocityBodyY = response.Verticalspeed;
 
-                                if (assistantSettings["realisticTowProcedures"] == 0)
+                                if ((!assistantSettings.ContainsKey("realisticTowProcedures") || assistantSettings["realisticTowProcedures"] == 0))
                                 {
                                     double liftPower = towCommit.VelocityBodyZ > 15 ? (towCommit.VelocityBodyZ - 15) * 0.1 : 0;
 
@@ -2372,11 +2396,9 @@ namespace MSFS_Kinetic_Assistant
                                 break;
                         }
                     }
-
-
                     else
                     {
-                        Console.WriteLine("Unknown request ID " + (uint)Requests.PlaneInfo + " received (type " + e.Data.GetType() + ")");
+                        Console.WriteLine("Unknown request ID " + (uint)e.RequestId + " received (type " + e.Data.GetType() + ")");
                     }
                 }
                 catch (Exception ex)
@@ -2433,7 +2455,7 @@ namespace MSFS_Kinetic_Assistant
                             //towScanMode = TowScanMode.Scan;
                             Console.WriteLine("Tow plane number " + insertedTowPlane);
 
-                            if (assistantSettings["realisticTowProcedures"] == 0 && towingTarget == TARGETMAX && towScanMode >= TowScanMode.TowSearch)
+                            if ((!assistantSettings.ContainsKey("realisticTowProcedures") || assistantSettings["realisticTowProcedures"] == 0) && towingTarget == TARGETMAX && towScanMode >= TowScanMode.TowSearch)
                             {
                                 Console.WriteLine("Teleporting tow plane");
                                 _fsConnect.AIReleaseControl(insertedTowPlane.Key, Requests.TowPlane);
@@ -2452,25 +2474,27 @@ namespace MSFS_Kinetic_Assistant
 
         private void trackControlChanges()
         {
-            foreach (var field in typeof(PlaneInfoResponse).GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public))
-                if (field.FieldType == typeof(double) && field.Name.StartsWith("LIGHT") &&
-                    (double)field.GetValue(_planeInfoResponse) != (double)field.GetValue(_planeInfoResponseLast))
-                {
-                    if (absoluteTime - controlTimestamps[field.Name] < 1.0)
+            if (_planeAvionicsResponse.TotalWeight != 0)
+            {
+                foreach (var field in typeof(PlaneAvionicsResponse).GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public))
+                    if (controlTimestamps.ContainsKey(field.Name) && field.FieldType == typeof(double) && field.Name.StartsWith("LIGHT") &&
+                        (double)field.GetValue(_planeAvionicsResponse) != (double)field.GetValue(_planeAvionicsResponseLast))
                     {
-                        Console.WriteLine(field.Name + " toggle detected");
+                        if (absoluteTime - controlTimestamps[field.Name] < 1.0)
+                        {
+                            Console.WriteLine(field.Name + " toggle detected");
 
-                        // FIND FUNTION TO TOGGLE
-                        Application.Current.Dispatcher.Invoke(() => runControlFunction(field.Name));
+                            // FIND FUNTION TO TOGGLE
+                            Application.Current.Dispatcher.Invoke(() => runControlFunction(field.Name));
 
-                        controlTimestamps[field.Name] = 0;
+                            controlTimestamps[field.Name] = 0;
+                        }
+                        else
+                        {
+                            controlTimestamps[field.Name] = absoluteTime;
+                        }
                     }
-                    else
-                    {
-                        controlTimestamps[field.Name] = absoluteTime;
-                    }
-                }
-
+            }
         }
 
         private void runControlFunction(string fieldName)
@@ -2505,45 +2529,48 @@ namespace MSFS_Kinetic_Assistant
         {
             Console.WriteLine("InitializeDataDefinitions");
 
+            // PLANE INFO
             List<SimProperty> definition = new List<SimProperty>();
-
-            definition.Add(new SimProperty(FsSimVar.Title, FsUnit.None, SIMCONNECT_DATATYPE.STRING256));
             definition.Add(new SimProperty(FsSimVar.PlaneLatitude, FsUnit.Radians, SIMCONNECT_DATATYPE.FLOAT64));
             definition.Add(new SimProperty(FsSimVar.PlaneLongitude, FsUnit.Radians, SIMCONNECT_DATATYPE.FLOAT64));
             definition.Add(new SimProperty(FsSimVar.PlaneAltitudeAboveGround, FsUnit.Meter, SIMCONNECT_DATATYPE.FLOAT64));
-            definition.Add(new SimProperty(FsSimVar.StaticCGtoGround, FsUnit.Meter, SIMCONNECT_DATATYPE.FLOAT64));
             definition.Add(new SimProperty(FsSimVar.PlaneAltitude, FsUnit.Meter, SIMCONNECT_DATATYPE.FLOAT64));
             definition.Add(new SimProperty(FsSimVar.AbsoluteTime, FsUnit.Second, SIMCONNECT_DATATYPE.FLOAT64));
             definition.Add(new SimProperty(FsSimVar.PlaneHeading, FsUnit.Radians, SIMCONNECT_DATATYPE.FLOAT64));
             definition.Add(new SimProperty(FsSimVar.PlanePitch, FsUnit.Radians, SIMCONNECT_DATATYPE.FLOAT64));
             definition.Add(new SimProperty(FsSimVar.PlaneBank, FsUnit.Radians, SIMCONNECT_DATATYPE.FLOAT64));
-            definition.Add(new SimProperty(FsSimVar.SimOnGround, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
-            definition.Add(new SimProperty(FsSimVar.BrakeParkingPosition, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
-            definition.Add(new SimProperty(FsSimVar.OnAnyRunway, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
-            definition.Add(new SimProperty(FsSimVar.IsSlewActive, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
             definition.Add(new SimProperty(FsSimVar.GpsGroundSpeed, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
             definition.Add(new SimProperty(FsSimVar.AirspeedIndicated, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
             definition.Add(new SimProperty(FsSimVar.Verticalspeed, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
             definition.Add(new SimProperty(FsSimVar.AmbientWindY, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
-            definition.Add(new SimProperty(FsSimVar.TotalWeight, FsUnit.Pounds, SIMCONNECT_DATATYPE.FLOAT64));
-            definition.Add(new SimProperty(FsSimVar.SimRate, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
-
-            // LIGHT STUFF
-            definition.Add(new SimProperty(FsSimVar.LIGHTPANEL, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
-            definition.Add(new SimProperty(FsSimVar.LIGHTSTROBE, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
-            definition.Add(new SimProperty(FsSimVar.LIGHTLANDING, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
-            definition.Add(new SimProperty(FsSimVar.LIGHTTAXI, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
-            definition.Add(new SimProperty(FsSimVar.LIGHTBEACON, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
-            definition.Add(new SimProperty(FsSimVar.LIGHTNAV, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
-            definition.Add(new SimProperty(FsSimVar.LIGHTLOGO, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
-            definition.Add(new SimProperty(FsSimVar.LIGHTWING, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
-            definition.Add(new SimProperty(FsSimVar.LIGHTRECOGNITION, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
-            definition.Add(new SimProperty(FsSimVar.LIGHTCABIN, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
-            definition.Add(new SimProperty(FsSimVar.LIGHTGLARESHIELD, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
-            definition.Add(new SimProperty(FsSimVar.LIGHTPEDESTRAL, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
-            definition.Add(new SimProperty(FsSimVar.LIGHTPOTENTIOMETER, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
 
             fsConnect.RegisterDataDefinition<PlaneInfoResponse>(Definitions.PlaneInfo, definition);
+
+            // AVIONICS
+            List<SimProperty> aDefinition = new List<SimProperty>();
+            aDefinition.Add(new SimProperty(FsSimVar.Title, FsUnit.None, SIMCONNECT_DATATYPE.STRING256));
+            aDefinition.Add(new SimProperty(FsSimVar.StaticCGtoGround, FsUnit.Meter, SIMCONNECT_DATATYPE.FLOAT64));
+            aDefinition.Add(new SimProperty(FsSimVar.SimOnGround, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
+            aDefinition.Add(new SimProperty(FsSimVar.BrakeParkingPosition, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
+            aDefinition.Add(new SimProperty(FsSimVar.OnAnyRunway, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
+            aDefinition.Add(new SimProperty(FsSimVar.IsSlewActive, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
+            aDefinition.Add(new SimProperty(FsSimVar.TotalWeight, FsUnit.Pounds, SIMCONNECT_DATATYPE.FLOAT64));
+            aDefinition.Add(new SimProperty(FsSimVar.SimRate, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
+            aDefinition.Add(new SimProperty(FsSimVar.LIGHTPANEL, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
+            aDefinition.Add(new SimProperty(FsSimVar.LIGHTSTROBE, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
+            aDefinition.Add(new SimProperty(FsSimVar.LIGHTLANDING, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
+            aDefinition.Add(new SimProperty(FsSimVar.LIGHTTAXI, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
+            aDefinition.Add(new SimProperty(FsSimVar.LIGHTBEACON, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
+            aDefinition.Add(new SimProperty(FsSimVar.LIGHTNAV, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
+            aDefinition.Add(new SimProperty(FsSimVar.LIGHTLOGO, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
+            aDefinition.Add(new SimProperty(FsSimVar.LIGHTWING, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
+            aDefinition.Add(new SimProperty(FsSimVar.LIGHTRECOGNITION, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
+            aDefinition.Add(new SimProperty(FsSimVar.LIGHTCABIN, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
+            aDefinition.Add(new SimProperty(FsSimVar.LIGHTGLARESHIELD, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
+            aDefinition.Add(new SimProperty(FsSimVar.LIGHTPEDESTRAL, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
+            aDefinition.Add(new SimProperty(FsSimVar.LIGHTPOTENTIOMETER, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
+
+            fsConnect.RegisterDataDefinition<PlaneAvionicsResponse>(Definitions.PlaneAvionics, aDefinition);
 
             List<SimProperty> cDefinition = new List<SimProperty>();
             cDefinition.Add(new SimProperty(FsSimVar.VelocityBodyX, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
@@ -2557,6 +2584,11 @@ namespace MSFS_Kinetic_Assistant
             cDefinition.Add(new SimProperty(FsSimVar.LIGHTTAXI, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
 
             fsConnect.RegisterDataDefinition<PlaneInfoCommit>(Definitions.PlaneCommit, cDefinition);
+
+            List<SimProperty> lDefinition = new List<SimProperty>();
+            lDefinition.Add(new SimProperty(FsSimVar.VelocityBodyY, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
+
+            fsConnect.RegisterDataDefinition<PlaneInfoLift>(Definitions.PlaneLift, lDefinition);
 
             List<SimProperty> rDefinition = new List<SimProperty>();
             rDefinition.Add(new SimProperty(FsSimVar.RotationVelocityBodyX, FsUnit.RadianPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
@@ -2892,17 +2924,17 @@ namespace MSFS_Kinetic_Assistant
                                 ServerStop();
                             }
                         }
-                        /*else if (((ComboBox)sender).Name == "preferredServer")
+                        else if (((ComboBox)sender).Name == "preferredServer")
                         {
-                            loadEventsList(null, null);
-                        }*/
+                            //loadEventsList(null, null);
+                        }
                     }
                     else if (sender != null && sender.GetType() == typeof(Slider))
                     {
                         if (((Slider)sender).Name == "RequestsFrequency")
                         {
                             launchTimer.Interval = new TimeSpan(0, 0, 0, 0, 1000 / Math.Max(10, (int)assistantSettings["RequestsFrequency"]));
-                            //Console.WriteLine("NEW INTERVAL: " + launchTimer.Interval.ToString());
+                            nearbyTimer.Interval = new TimeSpan(0, 0, 0, 0, 20000 / Math.Max(10, (int)(assistantSettings.ContainsKey("RequestsFrequency") ? assistantSettings["RequestsFrequency"] : 10)));
                         }
                         else if (((Slider)sender).Name == "RadarScale")
                         {
@@ -2965,7 +2997,6 @@ namespace MSFS_Kinetic_Assistant
             }
 
             addLogMessage(text);
-            Console.WriteLine(text);
         }
 
         private void addLogMessage(string text, int clr = 0)
@@ -2978,6 +3009,7 @@ namespace MSFS_Kinetic_Assistant
 
                 Application.Current.Dispatcher.Invoke(() => messagesLog.Children.Insert(0, makeTextBlock(DateTime.UtcNow.ToString("u") + ": " + text, color, 10, TextWrapping.Wrap)));
             }
+            Console.WriteLine(text);
         }
 
         private void playSound(string soundName)
@@ -3280,8 +3312,8 @@ namespace MSFS_Kinetic_Assistant
                                 return;
                             }
                         }
-                        string filename = _planeInfoResponse.Title + " - " + DateTime.UtcNow.ToString("s").Replace(":", "-") + ".gpx";
-                        KeyValuePair<double, string> trackContentAligned = _trackingClass.buildTrackFile(AppName.Text, "", _planeInfoResponse, _mathClass, "recorded_track_" + filename, true);
+                        string filename = _planeAvionicsResponse.Title + " - " + DateTime.UtcNow.ToString("s").Replace(":", "-") + ".gpx";
+                        KeyValuePair<double, string> trackContentAligned = _trackingClass.buildTrackFile(AppName.Text, "", _planeInfoResponse, _planeAvionicsResponse, _mathClass, "recorded_track_" + filename, true);
                         _trackingClass.saveTrackfile(trackContentAligned.Value, zipDirectory, "recorded_track_" + filename);
 
                         showMessage("Recorded track saved, length: " + _trackingClass.recordingCounter.ToString("0") + " seconds", _fsConnect);
@@ -3298,7 +3330,7 @@ namespace MSFS_Kinetic_Assistant
         {
             if (validConnection())
             {
-                beforeLoadTrackRecord();
+                beforeLoadTrackRecord(0);
 
                 OpenFileDialog sfd = new OpenFileDialog();
                 sfd.Multiselect = true;
@@ -3325,9 +3357,9 @@ namespace MSFS_Kinetic_Assistant
             }
         }
 
-        public void beforeLoadTrackRecord(bool towPlane = false)
+        public void beforeLoadTrackRecord(int mode)
         {
-            if (towPlane)
+            if (mode == 1)
             {
                 towScanType.SelectedIndex = 1;
                 if (RadarScale.Value < 0.2)
@@ -3345,7 +3377,7 @@ namespace MSFS_Kinetic_Assistant
             }
 
             _trackingClass.ghostTeleport = new winchPosition();
-            if (towPlane || assistantSettings.ContainsKey("ghostTeleport") && assistantSettings["ghostTeleport"] != 0)
+            if (mode == 1 || mode == 0 && assistantSettings.ContainsKey("ghostTeleport") && assistantSettings["ghostTeleport"] != 0)
             {
                 _trackingClass.ghostTeleport.radius = _planeInfoResponse.PlaneHeading;
                 _trackingClass.ghostTeleport.alt = _planeInfoResponse.Altitude;
@@ -3493,7 +3525,7 @@ namespace MSFS_Kinetic_Assistant
         public void ClearRecords(object sender, EventArgs e)
         {
             _trackingClass.clearRecords(_fsConnect);
-            GhostsList.Children.Clear();
+            Application.Current.Dispatcher.Invoke(() => GhostsList.Children.Clear());
         }
         // TRACKING ENDS
     }

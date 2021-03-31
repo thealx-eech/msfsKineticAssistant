@@ -6,25 +6,30 @@ namespace MSFS_Kinetic_Assistant
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
     public struct PlaneInfoResponse
     {
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
-        public String Title;
         public double Latitude;
         public double Longitude;
         public double AltitudeAboveGround;
-        public double StaticCGtoGround;
         public double Altitude;
         public double AbsoluteTime;
         public double PlaneHeading;
         public double PlanePitch;
         public double PlaneBank;
-        public double SimOnGround;
-        public double BrakeParkingPosition;
-        public double OnAnyRunway;
-        public double IsSlewActive;
         public double GpsGroundSpeed;
         public double AirspeedIndicated;
         public double VerticalSpeed;
         public double AmbientWindY;
+    };
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
+    public struct PlaneAvionicsResponse
+    {
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
+        public String Title;
+        public double StaticCGtoGround;
+        public double SimOnGround;
+        public double BrakeParkingPosition;
+        public double OnAnyRunway;
+        public double IsSlewActive;
         public double TotalWeight;
         public double SimRate;
 
@@ -41,8 +46,6 @@ namespace MSFS_Kinetic_Assistant
         public double LIGHTGLARESHIELD;
         public double LIGHTPEDESTRAL;
         public double LIGHTPOTENTIOMETER;
-
-        // SHORTCUTS
     };
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
@@ -51,6 +54,12 @@ namespace MSFS_Kinetic_Assistant
         public double RotationVelocityBodyX;
         public double RotationVelocityBodyY;
         public double RotationVelocityBodyZ;
+    };
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
+    public struct PlaneInfoLift
+    {
+        public double VelocityBodyY;
     };
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
