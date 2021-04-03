@@ -482,7 +482,7 @@
                                     <ColumnDefinition Width="*"></ColumnDefinition>
                                 </Grid.ColumnDefinitions>
                                 <Button Background="#55FFFFFF" Foreground="DarkGreen" BorderBrush="DarkGreen" Grid.Column="0" Click="LoadRecord" Name="LoadRecordButton" VerticalAlignment="Top" HorizontalAlignment="Stretch">LOAD</Button>
-                                <Button Background="#55FFFFFF" Foreground="DarkGreen" BorderBrush="DarkGreen" Grid.Column="1" Click="PlayRecords" Name="PlayRecordsButton" VerticalAlignment="Top" HorizontalAlignment="Stretch">PLAY</Button>
+                                <Button Background="#55FFFFFF" Foreground="DarkGreen" BorderBrush="DarkGreen" Grid.Column="1" Click="PlayRecords" Name="PlayRecordsButton" HorizontalAlignment="Stretch">PLAY</Button>
                                 <Button Background="#55FFFFFF" Foreground="DarkGreen" BorderBrush="DarkGreen" Grid.Column="2" Click="ClearRecords" Name="ClearRecordsButton" VerticalAlignment="Top" HorizontalAlignment="Stretch">CLEAR</Button>
                                 <Button Background="#55FFFFFF" Foreground="DarkGreen" BorderBrush="DarkGreen" Grid.Column="3" Click="StartRecord" Name="StartRecordButton" VerticalAlignment="Top" HorizontalAlignment="Stretch">REC</Button>
                             </Grid>

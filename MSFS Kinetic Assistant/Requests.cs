@@ -19,6 +19,7 @@
         WeatherData = 14,
         PlaneAvionics = 15,
         PlaneLift = 16,
+        GhostCommit = 17,
     }
 
     public enum Definitions
@@ -40,5 +41,6 @@
         WeatherData = 14,
         PlaneAvionics = 15,
         PlaneLift = 16,
+        GhostCommit = 17,
     }
 }

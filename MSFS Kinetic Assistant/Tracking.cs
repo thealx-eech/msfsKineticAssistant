@@ -45,8 +45,24 @@ namespace MSFS_Kinetic_Assistant
 
             return deg;
         }
+        public double normalizeRadAngle(double angle)
+        {
+            if (angle < 0) { angle += 2 * Math.PI; }
+            return angle;
+        }
 
-        public void captureTrackPoint(PlaneInfoResponse _planeInfoResponse, PlaneAvionicsResponse _planeAvionicsResponse, PlaneInfoCommit _planeCommit, double absoluteTime, double baseInterval = 0.5)
+        public double zeroeRadAngle(double angle)
+        {
+            angle %= 2 * Math.PI;
+
+            if (angle > Math.PI) { angle -= 2 * Math.PI; }
+            else if (angle < -Math.PI) { angle += 2 * Math.PI; }
+
+            return angle;
+        }
+
+
+        public void captureTrackPoint(PlaneInfoResponse _planeInfoResponse, PlaneAvionicsResponse _planeAvionicsResponse, double absoluteTime, double baseInterval = 0.5)
         {
             double trackCaptureInterval = Math.Abs(_planeInfoResponse.AirspeedIndicated) > baseInterval ?
                 Math.Max(baseInterval, Math.Abs(_planeInfoResponse.AirspeedIndicated) / 30 - 1) :
@@ -56,7 +72,7 @@ namespace MSFS_Kinetic_Assistant
             {
                 lastTrackCapture = absoluteTime;
                 trackRecording.Add(new TrackPoint(new GeoLocation(_planeInfoResponse.Latitude, _planeInfoResponse.Longitude), _planeInfoResponse.Altitude, (int)_planeInfoResponse.AltitudeAboveGround,
-                    _planeCommit.VelocityBodyZ, normalizeAngle(_planeInfoResponse.PlaneHeading), normalizeAngle(_planeInfoResponse.PlanePitch), normalizeAngle(_planeInfoResponse.PlaneBank),
+                    _planeInfoResponse.VelocityBodyZ, normalizeAngle(_planeInfoResponse.PlaneHeading), normalizeAngle(_planeInfoResponse.PlanePitch), normalizeAngle(_planeInfoResponse.PlaneBank),
                     packLights(_planeAvionicsResponse), packAvionics(_planeAvionicsResponse), DateTime.UtcNow, recordingCounter));
 
                 Console.WriteLine("Track capture: " + recordingCounter);
@@ -379,7 +395,7 @@ namespace MSFS_Kinetic_Assistant
             {
             }
         }
-        public TowInfoPitch updateGhostPlayer(uint ID, NearbyInfoResponse response, TowInfoPitch towCommit, FsConnect _fsConnect, MathClass _mathClass, double absoluteTime)
+        public GhostCommit updateGhostPlayer(uint ID, NearbyInfoResponse response, GhostCommit towCommit, FsConnect _fsConnect, MathClass _mathClass, double absoluteTime)
         {
             int index = 0;
             double deltaTime = 0;
@@ -429,26 +445,23 @@ namespace MSFS_Kinetic_Assistant
                             double distancePrev = _mathClass.findDistanceBetweenPoints(response.Latitude, response.Longitude, prev.Location.Latitude, prev.Location.Longitude);
                             double distanceCurr = _mathClass.findDistanceBetweenPoints(response.Latitude, response.Longitude, curr.Location.Latitude, curr.Location.Longitude);
                             double distanceNext = _mathClass.findDistanceBetweenPoints(response.Latitude, response.Longitude, next.Location.Latitude, next.Location.Longitude);
-                            double bearing = _mathClass.findBearingToPoint(response.Latitude, response.Longitude, next.Location.Latitude, next.Location.Longitude);
-                            if (bearing < 0) { bearing += 2 * Math.PI; }
-                            if (towCommit.Heading < 0) { towCommit.Heading += 2 * Math.PI; }
 
-                            bearing = (bearing - towCommit.Heading) % (2 * Math.PI);
+                            double bearing = normalizeRadAngle(_mathClass.findBearingToPoint(response.Latitude, response.Longitude, next.Location.Latitude, next.Location.Longitude));
+                            response.Heading = normalizeRadAngle(response.Heading);
+                            bearing = zeroeRadAngle(bearing - response.Heading);
+                            double newHeading = zeroeRadAngle(response.Heading + (absoluteTime - ghostPlane.LastTrackPlayed) * bearing);
+                            towCommit.RotationVelocityBodyY = Math.Sin(newHeading - response.Heading);
+                            Console.WriteLine($"Tracking heading: {response.Heading:F4} bearing: {bearing:F4} newHeading: {newHeading:F4}");
 
-                            if (bearing > Math.PI) { bearing -= 2 * Math.PI; }
-                            else if (bearing < -Math.PI) { bearing += 2 * Math.PI; }
+                            double requiredBank = ((1 - progress) * (prev.Roll * Math.PI / 180 - response.Bank) + progress * (curr.Roll * Math.PI / 180 - response.Bank)) / 2;
+                            towCommit.RotationVelocityBodyZ = Math.Sin(requiredBank - response.Bank);
+                            double requiredPitch = ((1 - progress) * (prev.Pitch * Math.PI / 180 - response.Pitch) + progress * (prev.Pitch * Math.PI / 180 - response.Pitch)) / 2;
+                            towCommit.RotationVelocityBodyX = Math.Sin(requiredPitch - response.Pitch);
 
-                            towCommit.Bank = /*0.9 * towCommit.Bank + 0.1 **/ (((1 - progress) * ((double)prev.Roll) + progress * ((double)curr.Roll)) / 2 * Math.PI / 180);
-                            towCommit.Pitch = /*0.9 * towCommit.Bank + 0.1 **/ (((1 - progress) * ((double)prev.Pitch) + progress * ((double)curr.Pitch)) / 2 * Math.PI / 180);
+                            Console.WriteLine($"RotationVelocityBodyX: {towCommit.RotationVelocityBodyX:F4} RotationVelocityBodyY: {towCommit.RotationVelocityBodyY:F4} RotationVelocityBodyZ: {towCommit.RotationVelocityBodyZ:F4}");
+                            //towCommit.Heading = newHeading;
 
-                            double newHeading = towCommit.Heading + (absoluteTime - ghostPlane.LastTrackPlayed) * bearing;
-                            newHeading %= 2 * Math.PI;
-                            if (newHeading > Math.PI) { newHeading -= 2 * Math.PI; }
-                            else if (newHeading < -Math.PI) { newHeading += 2 * Math.PI; }
-
-                            Console.WriteLine("Tracking heading " + towCommit.Heading + " bearing" + bearing + " newHeading" + newHeading);
-                            towCommit.Heading = newHeading;
-
+                            towCommit.VelocityBodyX = 0;
                             towCommit.VelocityBodyY = ((1 - progress) * (prev.Elevation - response.Altitude) + progress * (curr.Elevation - response.Altitude)) / 2;
                             towCommit.VelocityBodyZ = (0.8 * curr.Velocity + 0.1 * distanceCurr / Math.Max(1, timeLeft)) * (Math.Abs(distanceCurr) < 10 ? Math.Abs(distanceCurr) / 10 : 1);
 

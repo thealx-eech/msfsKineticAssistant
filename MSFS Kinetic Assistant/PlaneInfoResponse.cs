@@ -18,6 +18,28 @@ namespace MSFS_Kinetic_Assistant
         public double AirspeedIndicated;
         public double VerticalSpeed;
         public double AmbientWindY;
+        public double VelocityBodyX;
+        public double VelocityBodyY;
+        public double VelocityBodyZ;
+        public double RotationVelocityBodyX;
+        public double RotationVelocityBodyY;
+        public double RotationVelocityBodyZ;
+    };
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
+    public struct PlaneInfoCommit
+    {
+        public double VelocityBodyX;
+        public double VelocityBodyY;
+        public double VelocityBodyZ;
+    };
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
+    public struct PlaneInfoRotate
+    {
+        public double RotationVelocityBodyX;
+        public double RotationVelocityBodyY;
+        public double RotationVelocityBodyZ;
     };
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
@@ -32,7 +54,10 @@ namespace MSFS_Kinetic_Assistant
         public double IsSlewActive;
         public double TotalWeight;
         public double SimRate;
-
+        public double TailhookPosition;
+        public double LaunchbarPosition;
+        public double WaterRudderHandlePosition;
+        public double Smoke;
         public double LIGHTPANEL;
         public double LIGHTSTROBE;
         public double LIGHTLANDING;
@@ -46,14 +71,6 @@ namespace MSFS_Kinetic_Assistant
         public double LIGHTGLARESHIELD;
         public double LIGHTPEDESTRAL;
         public double LIGHTPOTENTIOMETER;
-    };
-
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
-    public struct PlaneInfoRotate
-    {
-        public double RotationVelocityBodyX;
-        public double RotationVelocityBodyY;
-        public double RotationVelocityBodyZ;
     };
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
@@ -109,17 +126,15 @@ namespace MSFS_Kinetic_Assistant
     };
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
-    public struct PlaneInfoCommit
+    public struct GhostCommit
     {
         public double VelocityBodyX;
         public double VelocityBodyY;
         public double VelocityBodyZ;
-        public double AbsoluteTime;
-        public double TailhookPosition;
-        public double LaunchbarPosition;
-        //public double WaterRudderHandlePosition;
-        public double LIGHTLANDING;
-        public double LIGHTTAXI;
+        public double RotationVelocityBodyX;
+        public double RotationVelocityBodyY;
+        public double RotationVelocityBodyZ;
+
     };
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
