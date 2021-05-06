@@ -1,16 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
-using static MSFS_Kinetic_Assistant.MainWindow;
 
 namespace MSFS_Kinetic_Assistant
 {
@@ -373,6 +370,13 @@ namespace MSFS_Kinetic_Assistant
                 Ellipse ellipse = new Ellipse();
                 ellipse.Name = lbl + "_" + id;
                 group.Children.Add(ellipse);
+
+                Label label = new Label();
+                label.Name = "Label_" + lbl + "_" + id;
+                label.FontSize = 10;
+                label.Content = Math.Round(thermalsList[id].airspeed) + "m/s" + (thermalsList[id].alt > 1000 ? Environment.NewLine + (thermalsList[id].alt / 0.305).ToString("0") + "ft AGL" : "");
+                label.Foreground = new SolidColorBrush(Colors.DarkRed);
+                group.Children.Add(label);
             }
 
             Console.WriteLine(id + " radar " + lbl + "s loaded");
@@ -427,7 +431,16 @@ namespace MSFS_Kinetic_Assistant
 
                                 //Console.WriteLine(id + " scale: " + scale + " modif: " + finalModifier);
 
-                                break;
+                                //break;
+                            }
+                            else if (el.GetType() == typeof(Label) && ((Label)el).Name == "Label_" + id)
+                            {
+                                Label label = (Label)el;
+
+                                Canvas.SetLeft(label, 110 + thermalDirection.groundDistance / scale * Math.Sin(thermalDirection.heading));
+                                Canvas.SetTop(label, 115 - thermalDirection.groundDistance / scale * Math.Cos(thermalDirection.heading));
+
+                                //break;
                             }
                         }
 
@@ -442,6 +455,14 @@ namespace MSFS_Kinetic_Assistant
         }
 
         // WAYPOINTS
+        public string sanitizeString(string name)
+        {
+            if (name.Contains('|'))
+                name = name.Split('|')[0];
+
+            Regex rgx = new Regex("[^a-zA-Z0-9]");
+            return rgx.Replace(name, "_");
+        }
         public void insertRadarWaypoints(Canvas RadarCanvas, List<Waypoint> waypointsList)
         {
             clearRadarWaypoints(RadarCanvas);
@@ -457,12 +478,18 @@ namespace MSFS_Kinetic_Assistant
                 /*Ellipse ellipse = new Ellipse();
                 ellipse.Name = "Waypoint_" + wp.Name;*/
                 Canvas arc = new Canvas();
-                arc.Name = "Waypoint_" + wp.Name;
+                arc.Name = "Waypoint_" + sanitizeString(wp.Name) + wp.ID; // UNIQUE NAME!
                 group.Children.Add(arc);
 
                 Line leg = new Line();
-                leg.Name = "Leg_" + wp.Name;
+                leg.Name = "Leg_" + sanitizeString(wp.Name) + wp.ID;
                 group.Children.Add(leg);
+
+                Label label = new Label();
+                label.Name = "Label_" + sanitizeString(wp.Name) + wp.ID;
+                label.FontSize = 10;
+                label.Content = wp.Name + Environment.NewLine + "MIN: " + wp.Elevation + "ft" + Environment.NewLine + "MAX: " + wp.Height + "ft";
+                group.Children.Add(label);
 
                 id++;
             }
@@ -493,7 +520,7 @@ namespace MSFS_Kinetic_Assistant
             }
         }
 
-        public void updateRadarWaypoints(Canvas RadarCanvas, Waypoint wp, double distance, double heading, double width, double scale, double nextBearing, double nextDistance)
+        public void updateRadarWaypoints(Canvas RadarCanvas, Waypoint wp, double distance, double heading, double width, double scale, double nextBearing, double nextDistance, double altitude)
         {
             scale = Math.Max(0.1, scale) / 125 * 1000;
 
@@ -507,7 +534,7 @@ namespace MSFS_Kinetic_Assistant
                         {
                             double opacity = !string.IsNullOrEmpty(wp.Entered) || !string.IsNullOrEmpty(wp.Passed) ? 0.1 : 0.5; ;
 
-                            if (el.GetType() == typeof(Canvas) && ((Canvas)el).Name == "Waypoint_" + wp.Name)
+                            if (el.GetType() == typeof(Canvas) && ((Canvas)el).Name == "Waypoint_" + sanitizeString(wp.Name) + wp.ID)
                             {
                                 Canvas cnv = (Canvas)el;
 
@@ -523,7 +550,7 @@ namespace MSFS_Kinetic_Assistant
 
                                 //break;
                             }
-                            else if (el.GetType() == typeof(Line) && ((Line)el).Name == "Leg_" + wp.Name)
+                            else if (el.GetType() == typeof(Line) && ((Line)el).Name == "Leg_" + sanitizeString(wp.Name) + wp.ID)
                             {
                                 Line leg = (Line)el;
 
@@ -535,6 +562,19 @@ namespace MSFS_Kinetic_Assistant
                                 leg.X2 = 125 + distance / scale * Math.Sin(heading) + nextDistance / scale * Math.Sin(nextBearing); ;
                                 leg.Y1 = 125 - distance / scale * Math.Cos(heading);
                                 leg.Y2 = 125 - distance / scale * Math.Cos(heading) - nextDistance / scale * Math.Cos(nextBearing);
+
+                                //break;
+                            }
+                            else if (el.GetType() == typeof(Label) && ((Label)el).Name == "Label_" + sanitizeString(wp.Name) + wp.ID)
+                            {
+                                Label label = (Label)el;
+                                if (altitude == 0)
+                                    label.Foreground = new SolidColorBrush(Colors.Black);
+                                else
+                                    label.Foreground = new SolidColorBrush(altitude > 0 ? Colors.DarkRed : Colors.DarkBlue);
+
+                                Canvas.SetLeft(label, 125 + distance / scale * Math.Sin(heading));
+                                Canvas.SetTop(label, 125 - distance / scale * Math.Cos(heading));
 
                                 break;
                             }
@@ -549,6 +589,5 @@ namespace MSFS_Kinetic_Assistant
                 Console.WriteLine("Failed to update radar waypoints: " + ex.Message);
             }
         }
-
     }
 }

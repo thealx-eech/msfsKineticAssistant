@@ -1,0 +1,37 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="/SCSS/common.css" />
+    <link rel="stylesheet" href="kaPanel.css?hdf" />
+
+    <script type="text/javascript" src="/JS/coherent.js"></script>
+    <script type="text/javascript" src="/JS/common.js"></script>
+    <script type="text/javascript" src="/JS/dataStorage.js"></script>
+    <script type="text/javascript" src="/JS/buttons.js"></script>
+    <script type="text/javascript" src="/JS/Services/ToolBarPanels.js"></script>
+    <script type="text/javascript" src="/JS/debug.js"></script>
+    <link rel="import" href="/templates/NewPushButton/NewPushButton.html" />
+    <link rel="import" href="/templates/ToggleButton/toggleButton.html" />
+    <link rel="import" href="/templates/tabMenu/tabMenu.html" />
+    <link rel="import" href="/templates/ingameUi/ingameUi.html" />
+    <link rel="import" href="/templates/ingameUiHeader/ingameUiHeader.html" />
+    <link rel="import" href="/templates/NewListButton/NewListButton.html" />
+
+    <!--<script type="text/javascript" src="panzoom.js"></script>-->
+    <script type="text/javascript" src="kaPanel.js?hjkhff"></script>
+</head>
+
+<body class="border-box">
+    <ingamepanel-ka>
+        <ingame-ui id="kaPanel" panel-id="KA_PANEL" title="" class="ingameUiFrame panelInvisible" content-fit="true" min-width="250" min-height="250">
+            <div id="kaPanelWrap">
+                <div id="kaPanelImageZoom"></div>
+                <div id="kaPanelImageError"></div>
+                <img id="kaPanelImageFront" />
+                <img id="kaPanelImageBack" />
+            </div>
+        </ingame-ui>
+    </ingamepanel-ka>
+</body>
+</html>

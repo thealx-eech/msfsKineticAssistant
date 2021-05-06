@@ -1,0 +1,29 @@
+{
+  "content": [
+    {
+      "path": "InGamePanels/ka-panel.spb",
+      "size": 633,
+      "date": 132640886295137633
+    },
+    {
+      "path": "html_ui/InGamePanels/ka-panel/kaPanel.css",
+      "size": 5142,
+      "date": 132640831513619973
+    },
+    {
+      "path": "html_ui/InGamePanels/ka-panel/kaPanel.html",
+      "size": 1711,
+      "date": 132640832760868563
+    },
+    {
+      "path": "html_ui/InGamePanels/ka-panel/kaPanel.js",
+      "size": 9226,
+      "date": 132640832761008615
+    },
+    {
+      "path": "html_ui/Textures/Menu/toolbar/KA_ICON.svg",
+      "size": 2641,
+      "date": 132547798550000000
+    }
+  ]
+}

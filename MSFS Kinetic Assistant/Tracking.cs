@@ -72,7 +72,7 @@ namespace MSFS_Kinetic_Assistant
             {
                 lastTrackCapture = absoluteTime;
                 trackRecording.Add(new TrackPoint(new GeoLocation(_planeInfoResponse.Latitude, _planeInfoResponse.Longitude), _planeInfoResponse.Altitude, (int)_planeInfoResponse.AltitudeAboveGround,
-                    _planeInfoResponse.VelocityBodyZ, normalizeAngle(_planeInfoResponse.PlaneHeading), normalizeAngle(_planeInfoResponse.PlanePitch), normalizeAngle(_planeInfoResponse.PlaneBank),
+                    _planeInfoResponse.VelocityBodyZ, _planeInfoResponse.AirspeedIndicated, normalizeAngle(_planeInfoResponse.PlaneHeading), normalizeAngle(_planeInfoResponse.PlanePitch), normalizeAngle(_planeInfoResponse.PlaneBank),
                     packLights(_planeAvionicsResponse), packAvionics(_planeAvionicsResponse), DateTime.UtcNow, recordingCounter));
 
                 Console.WriteLine("Track capture: " + recordingCounter);
@@ -82,7 +82,7 @@ namespace MSFS_Kinetic_Assistant
         public KeyValuePair<double, string> buildTrackFile(string appName, string nickName, PlaneInfoResponse _planeInfoResponse, PlaneAvionicsResponse _planeAvionicsResponse, MathClass _mathClass, string filename, bool timeAligned = false)
         {
             string str = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><gpx creator=\"" + appName + "\" version=\"1.0\"><trk><name>" + _planeAvionicsResponse.Title + " - " + nickName + "</name><desc></desc><trkseg>";
-            TrackPoint prev = new TrackPoint(new GeoLocation(0, 0), 0, 0, 0, 0, 0, 0, 0, 0, DateTime.Now, 0);
+            TrackPoint prev = new TrackPoint(new GeoLocation(0, 0), 0, 0, 0, 0, 0, 0, 0, 0, 0, DateTime.Now, 0);
             double distance = 0;
 
             foreach (TrackPoint trackPoint in trackRecording)
@@ -181,6 +181,10 @@ namespace MSFS_Kinetic_Assistant
                         if (trackPoint.Element("velocity") != null)
                             double.TryParse(trackPoint.Element("velocity").Value, NumberStyles.Any, CultureInfo.InvariantCulture, out velocity);
 
+                        double airspeed = 0;
+                        if (trackPoint.Element("airspeed") != null)
+                            double.TryParse(trackPoint.Element("airspeed").Value, NumberStyles.Any, CultureInfo.InvariantCulture, out velocity);
+
                         short heading = 0;
                         if (trackPoint.Element("heading") != null)
                             short.TryParse(trackPoint.Element("heading").Value, NumberStyles.Any, CultureInfo.InvariantCulture, out heading);
@@ -228,7 +232,7 @@ namespace MSFS_Kinetic_Assistant
                         heading += (short)headingOffset;
                         ele += altitudeOffset;
 
-                        ghostPlane.TrackPoints.Add(new TrackPoint(loc, ele, agl, velocity,
+                        ghostPlane.TrackPoints.Add(new TrackPoint(loc, ele, agl, velocity, airspeed,
                             (short)(heading > 180 ? heading - 360 : heading), (short)(pitch > 180 ? pitch - 360 : pitch), (short)(roll > 180 ? roll - 360 : roll),
                             lights, avionics, time, counter, trackPoint.Element("message") != null ? trackPoint.Element("message").Value : ""));
 
@@ -451,14 +455,14 @@ namespace MSFS_Kinetic_Assistant
                             bearing = zeroeRadAngle(bearing - response.Heading);
                             double newHeading = zeroeRadAngle(response.Heading + (absoluteTime - ghostPlane.LastTrackPlayed) * bearing);
                             towCommit.RotationVelocityBodyY = Math.Sin(newHeading - response.Heading);
-                            Console.WriteLine($"Tracking heading: {response.Heading:F4} bearing: {bearing:F4} newHeading: {newHeading:F4}");
+                            //Console.WriteLine($"Tracking heading: {response.Heading:F4} bearing: {bearing:F4} newHeading: {newHeading:F4}");
 
                             double requiredBank = ((1 - progress) * (prev.Roll * Math.PI / 180 - response.Bank) + progress * (curr.Roll * Math.PI / 180 - response.Bank)) / 2;
                             towCommit.RotationVelocityBodyZ = Math.Sin(requiredBank - response.Bank);
                             double requiredPitch = ((1 - progress) * (prev.Pitch * Math.PI / 180 - response.Pitch) + progress * (prev.Pitch * Math.PI / 180 - response.Pitch)) / 2;
                             towCommit.RotationVelocityBodyX = Math.Sin(requiredPitch - response.Pitch);
 
-                            Console.WriteLine($"RotationVelocityBodyX: {towCommit.RotationVelocityBodyX:F4} RotationVelocityBodyY: {towCommit.RotationVelocityBodyY:F4} RotationVelocityBodyZ: {towCommit.RotationVelocityBodyZ:F4}");
+                            //Console.WriteLine($"RotationVelocityBodyX: {towCommit.RotationVelocityBodyX:F4} RotationVelocityBodyY: {towCommit.RotationVelocityBodyY:F4} RotationVelocityBodyZ: {towCommit.RotationVelocityBodyZ:F4}");
                             //towCommit.Heading = newHeading;
 
                             towCommit.VelocityBodyX = 0;
@@ -494,7 +498,7 @@ namespace MSFS_Kinetic_Assistant
                                 }
                             }
 
-                            Console.WriteLine("Tracking animation " + (ghostPlane.Progress + deltaTime) + " h" + towCommit.VelocityBodyZ + " v" + towCommit.VelocityBodyY + " d" + distanceCurr);
+                            //Console.WriteLine("Tracking animation " + (ghostPlane.Progress + deltaTime) + " h" + towCommit.VelocityBodyZ + " v" + towCommit.VelocityBodyY + " d" + distanceCurr);
                         }
                         catch { }
                     }
@@ -566,12 +570,13 @@ namespace MSFS_Kinetic_Assistant
 
     public struct TrackPoint
     {
-        public TrackPoint(GeoLocation location, double elevation, int altitudeAboveGround, double velocity, short heading, short pitch, short roll, int lights, int avionics, DateTime time, double timer, string message = "")
+        public TrackPoint(GeoLocation location, double elevation, int altitudeAboveGround, double velocity, double airspeed, short heading, short pitch, short roll, int lights, int avionics, DateTime time, double timer, string message = "")
         {
             Location = location;
             Elevation = elevation;
             AltitudeAboveGround = altitudeAboveGround;
             Velocity = velocity;
+            Airspeed = airspeed;
             Heading = heading;
             Pitch = pitch;
             Roll = roll;
@@ -585,6 +590,7 @@ namespace MSFS_Kinetic_Assistant
         public double Elevation { get; set; }
         public double AltitudeAboveGround { get; set; }
         public double Velocity { get; set; }
+        public double Airspeed { get; set; }
         public short Heading { get; set; }
         public short Pitch { get; set; }
         public short Roll { get; set; }

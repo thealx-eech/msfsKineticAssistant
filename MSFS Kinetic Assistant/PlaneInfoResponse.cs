@@ -24,6 +24,9 @@ namespace MSFS_Kinetic_Assistant
         public double RotationVelocityBodyX;
         public double RotationVelocityBodyY;
         public double RotationVelocityBodyZ;
+        public double RotationAccelerationBodyX;
+        public double RotationAccelerationBodyY;
+        public double RotationAccelerationBodyZ;
     };
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
@@ -43,10 +46,22 @@ namespace MSFS_Kinetic_Assistant
     };
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
+    public struct PlaneInfoRotateAccel
+    {
+        public double RotationAccelerationBodyX;
+        public double RotationAccelerationBodyY;
+        public double RotationAccelerationBodyZ;
+    };
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
     public struct PlaneAvionicsResponse
     {
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
         public String Title;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
+        public String Type;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
+        public String Model;
         public double StaticCGtoGround;
         public double SimOnGround;
         public double BrakeParkingPosition;
@@ -58,6 +73,9 @@ namespace MSFS_Kinetic_Assistant
         public double LaunchbarPosition;
         public double WaterRudderHandlePosition;
         public double Smoke;
+        public double YokeYPosition;
+        public double YokeXPosition;
+        public double RudderPosition;
         public double LIGHTPANEL;
         public double LIGHTSTROBE;
         public double LIGHTLANDING;
@@ -76,7 +94,7 @@ namespace MSFS_Kinetic_Assistant
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
     public struct PlaneInfoLift
     {
-        public double VelocityBodyY;
+        public double Altitude;
     };
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
@@ -159,6 +177,7 @@ namespace MSFS_Kinetic_Assistant
         public double AmbientDensity;
         public double AmbientInCloud;
         public double AmbientPrecipState;
+        public double AmbientPrecipRate;
         public double AmbientPressure;
         public double AmbientSeaLevelPressure;
         public double AmbientStandardAtmTemperature;

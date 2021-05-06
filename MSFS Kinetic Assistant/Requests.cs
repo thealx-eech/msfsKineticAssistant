@@ -20,6 +20,7 @@
         PlaneAvionics = 15,
         PlaneLift = 16,
         GhostCommit = 17,
+        PlaneRotateAccel = 18,
     }
 
     public enum Definitions
@@ -42,5 +43,6 @@
         PlaneAvionics = 15,
         PlaneLift = 16,
         GhostCommit = 17,
+        PlaneRotateAccel = 18,
     }
 }

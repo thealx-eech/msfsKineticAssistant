@@ -137,7 +137,7 @@ namespace MSFS_Kinetic_Assistant
 
             double appliedVelocity = cableSpeed - planeMotion.Norm;
 
-            Console.WriteLine($"getBodyVelocity: {cableTension:F4} {appliedVelocity:F4}m/s  lengthDiff{lengthDiff:F4}m cableSpeed{cableSpeed:F4}");
+            //Console.WriteLine($"getBodyVelocity: {cableTension:F4} {appliedVelocity:F4}m/s  lengthDiff{lengthDiff:F4}m cableSpeed{cableSpeed:F4}");
             //Console.WriteLine($"cabC: {cableLength:F4}m cabP{cableLengthPrev:F4}m  cabPP{cableLengthPrePrev:F4}m");
 
             return appliedVelocity > 0 ? appliedVelocity : 0;
@@ -188,12 +188,14 @@ namespace MSFS_Kinetic_Assistant
     }
     public class Waypoint
     {
-        public Waypoint(GeoLocation loc, string name, string entered, string passed, double weight, double wind, double altitude, double elevation, double height, double width, bool bottomMeasurement, bool topMeasurement)
+        public Waypoint(int id, GeoLocation loc, string name, string entered, string passed, double fine, double weight, double wind, double altitude, double elevation, double height, double width, bool bottomMeasurement, bool topMeasurement)
         {
+            ID = id;
             Location = loc;
             Name = name;
             Entered = entered;
             Passed = passed;
+            Fine = Fine;
             Weight = weight;
             Wind = wind;
             Altitude = altitude;
@@ -204,10 +206,12 @@ namespace MSFS_Kinetic_Assistant
             TopMeasurement = topMeasurement;
         }
 
+        public int ID { get; set; }
         public GeoLocation Location { get; set; }
         public string Name { get; set; }
         public string Entered { get; set; }
         public string Passed { get; set; }
+        public double Fine { get; set; }
         public double Weight { get; set; }
         public double Wind { get; set; }
         public double Altitude { get; set; }

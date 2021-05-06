@@ -226,6 +226,7 @@
     <Resource Include="MEDIA\map.png" />
     <Resource Include="MEDIA\RadarCover.png" />
     <Resource Include="MEDIA\gliderIcon.png" />
+    <Resource Include="MEDIA\push.png" />
     <Content Include="MEDIA\true.wav" />
   </ItemGroup>
   <ItemGroup />
