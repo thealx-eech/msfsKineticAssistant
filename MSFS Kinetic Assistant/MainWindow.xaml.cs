@@ -306,9 +306,6 @@ namespace MSFS_Kinetic_Assistant
                 if (towScanMode > TowScanMode.Disabled && towingTarget == TARGETMAX && !_trackingClass.ghostPlayerActive())
                     _fsConnect.RequestData(Requests.NearbyObjects, Definitions.NearbyObjects, (uint)(1000 * Math.Min(allowedRadarScale, (assistantSettings.ContainsKey("RadarScale") ? assistantSettings["RadarScale"] : allowedRadarScale))), getTowObjectType());
 
-                if (taskInProcess)
-                    _fsConnect.RequestData(Requests.PlaneEngineData, Definitions.PlaneEngineData);
-
                 // RADAR PANEL
                 if (assistantSettings.ContainsKey("panelServer") && assistantSettings["panelServer"] != 0 && (absoluteTime - lastRadarRequest) <= 0.25)
                 {
@@ -371,7 +368,8 @@ namespace MSFS_Kinetic_Assistant
                     _fsConnect.RequestData(Requests.NearbyObjects, Definitions.NearbyObjects, (uint)(1000 * Math.Min(allowedRadarScale, assistantSettings["RadarScale"])), getTowObjectType());
 
                 if (assistantSettings.ContainsKey("towType") && assistantSettings["towType"] == 2 && _planeAvionicsResponse.SimOnGround == 100 && _planeInfoResponse.GpsGroundSpeed < 5 &&
-                    (launchTime == 0 || launchTime - absoluteTime > 0) && (_nearbyInfoResponse == null || !_nearbyInfoResponse.ContainsKey(towingTarget)))
+                    (launchTime == 0 || launchTime - absoluteTime > 0) && (_nearbyInfoResponse == null || !_nearbyInfoResponse.ContainsKey(towingTarget)) &&
+                    _planeEngineData.ThrottleLeverPosition1 < 10 && _planeEngineData.ThrottleLeverPosition2 < 10)
                 {
                     levelUpGlider(true);
                 }
@@ -383,6 +381,8 @@ namespace MSFS_Kinetic_Assistant
             if (validConnection())
             {
                 _fsConnect.RequestData(Requests.WeatherData, Definitions.WeatherData);
+
+                _fsConnect.RequestData(Requests.PlaneEngineData, Definitions.PlaneEngineData);
             }
         }
 
@@ -749,7 +749,7 @@ namespace MSFS_Kinetic_Assistant
 
                 if (control)
                 {
-                    double pushSpeed = 0.9 * _planeInfoResponse.GpsGroundSpeed + 0.1 * -_planeAvionicsResponse.YokeYPosition * lastFrameTiming / 10;
+                    double pushSpeed = 0.5 * _planeInfoResponse.GpsGroundSpeed + 0.5 * Math.Min(2,Math.Max(-2,-_planeAvionicsResponse.YokeYPosition / 25));
                     _planeCommit.VelocityBodyX = 0;
                     _planeCommit.VelocityBodyY = pushSpeed * Math.Sin(_planeInfoResponse.PlanePitch);
                     _planeCommit.VelocityBodyZ = pushSpeed;
@@ -2810,6 +2810,10 @@ namespace MSFS_Kinetic_Assistant
             eDefinition.Add(new SimProperty(FsSimVar.TURBTHRUST2, FsUnit.FootPounds, SIMCONNECT_DATATYPE.FLOAT64));
             eDefinition.Add(new SimProperty(FsSimVar.TURBTHRUST3, FsUnit.FootPounds, SIMCONNECT_DATATYPE.FLOAT64));
             eDefinition.Add(new SimProperty(FsSimVar.TURBTHRUST4, FsUnit.FootPounds, SIMCONNECT_DATATYPE.FLOAT64));
+            eDefinition.Add(new SimProperty(FsSimVar.ThrottleLeverPosition1, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
+            eDefinition.Add(new SimProperty(FsSimVar.ThrottleLeverPosition2, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
+            eDefinition.Add(new SimProperty(FsSimVar.ThrottleLeverPosition3, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
+            eDefinition.Add(new SimProperty(FsSimVar.ThrottleLeverPosition4, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
 
             fsConnect.RegisterDataDefinition<PlaneEngineData>(Definitions.PlaneEngineData, eDefinition);
 

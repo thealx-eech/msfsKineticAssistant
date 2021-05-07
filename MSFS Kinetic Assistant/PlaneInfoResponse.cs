@@ -166,6 +166,10 @@ namespace MSFS_Kinetic_Assistant
         public double ENGTORQUE2;
         public double ENGTORQUE3;
         public double ENGTORQUE4;
+        public double ThrottleLeverPosition1;
+        public double ThrottleLeverPosition2;
+        public double ThrottleLeverPosition3;
+        public double ThrottleLeverPosition4;
     };
 
 
