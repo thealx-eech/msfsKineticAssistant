@@ -80,6 +80,7 @@ namespace MSFS_Kinetic_Assistant
         double apiThermalsLoadedTime = 0;
         private List<winchPosition> thermalsList = new List<winchPosition>();
         private List<winchPosition> thermalsListAPI = new List<winchPosition>();
+        private double weatherChecked = 0;
         private double windDirection = 0;
         private double windVelocity = 0;
         private double thermalFlow = 0;
@@ -269,11 +270,6 @@ namespace MSFS_Kinetic_Assistant
             nearbyTimer.Start();
 
             dispatcherTimer = new DispatcherTimer();
-            dispatcherTimer.Interval = new TimeSpan(0, 0, 0, 10, 33);
-            dispatcherTimer.Tick += new EventHandler(weatherInterval);
-            dispatcherTimer.Start();
-
-            dispatcherTimer = new DispatcherTimer();
             dispatcherTimer.Interval = new TimeSpan(1, 0, 0);
             dispatcherTimer.Tick += new EventHandler(triggerCheckUpdate);
             dispatcherTimer.Start();
@@ -295,7 +291,7 @@ namespace MSFS_Kinetic_Assistant
                     _fsConnect.RequestData(Requests.PlaneInfo, Definitions.PlaneInfo);
 
                     // PACKET LOST??
-                    if (lastPacketReceived >= 5)
+                    if (lastPacketReceived >= 5 && taskInProcess)
                     {
                         Console.WriteLine("Packet lost, reconnect (" + lastPacketReceived + "s)");
                         toggleQuickConnect(false);
@@ -356,7 +352,7 @@ namespace MSFS_Kinetic_Assistant
                     _fsConnect.RequestData(Requests.PlaneInfo, Definitions.PlaneInfo);
 
                     // PACKET LOST??
-                    if (lastPacketReceived >= 5)
+                    if (lastPacketReceived >= 5 && taskInProcess)
                     {
                         Console.WriteLine("Packet lost, reconnect (" + lastPacketReceived + "s)");
                         toggleQuickConnect(false);
@@ -373,16 +369,6 @@ namespace MSFS_Kinetic_Assistant
                 {
                     levelUpGlider(true);
                 }
-            }
-        }
-
-        private void weatherInterval(object sender, EventArgs e)
-        {
-            if (validConnection())
-            {
-                _fsConnect.RequestData(Requests.WeatherData, Definitions.WeatherData);
-
-                _fsConnect.RequestData(Requests.PlaneEngineData, Definitions.PlaneEngineData);
             }
         }
 
@@ -1997,7 +1983,11 @@ namespace MSFS_Kinetic_Assistant
                     Application.Current.Dispatcher.Invoke(() => thermalsClearButton.Content = "No thermal maps loaded");
                 }
 
-                _fsConnect.RequestData(Requests.WeatherData, Definitions.WeatherData);
+                if (lastFrameTiming > 0)
+                {
+                    Console.WriteLine("REquesting weather " + lastFrameTiming);
+                    _fsConnect.RequestData(Requests.WeatherData, Definitions.WeatherData);
+                }
 
                 thermalsWorking = true;
                 //showMessage("Thermals enabled", _fsConnect);
@@ -2212,10 +2202,20 @@ namespace MSFS_Kinetic_Assistant
                         }
                         else
                         {
-                            lastFrameTiming = swCurrent - swLast;
+                            lastFrameTiming = Math.Max(0, swCurrent - swLast);
                         }
 
                         absoluteTime += lastFrameTiming;
+
+                        weatherChecked += lastFrameTiming;
+                        if (lastFrameTiming > 0 && validConnection() && weatherChecked >= 10)
+                        {
+                            Console.WriteLine("Requesting weather " + lastFrameTiming);
+                            _fsConnect.RequestData(Requests.WeatherData, Definitions.WeatherData);
+                            _fsConnect.RequestData(Requests.PlaneEngineData, Definitions.PlaneEngineData);
+
+                            weatherChecked = 0;
+                        }
 
                         _planeRotate = new PlaneInfoRotate();
                         _planeRotate.RotationVelocityBodyX = _planeInfoResponse.RotationVelocityBodyX;
