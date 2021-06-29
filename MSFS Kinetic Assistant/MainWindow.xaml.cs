@@ -1712,7 +1712,7 @@ namespace MSFS_Kinetic_Assistant
                 // S W N E
                 double[] bounds = getThermalsBounds(new GeoLocation(_planeInfoResponse.Latitude, _planeInfoResponse.Longitude), true);
 
-                if (bounds[0] != 0 && bounds[1] != 0 && bounds[2] != 0 && bounds[3] != 0 && bounds[0] != bounds[2] && bounds[1] != bounds[3])
+                if ((bounds[0] != 0 || bounds[1] != 0 || bounds[2] != 0 || bounds[3] != 0) && bounds[0] != bounds[2] && bounds[1] != bounds[3])
                 {
                     if (assistantSettings.ContainsKey("APIthermalsAutoload") && assistantSettings["APIthermalsAutoload"] == 1)
                     {
@@ -1775,7 +1775,12 @@ namespace MSFS_Kinetic_Assistant
                 }
                 else
                 {
-                    MessageBox.Show("Failed to request hotspots data");
+                    MessageBox.Show("Failed to request hotspots data, bounds:" +
+                        Environment.NewLine + bounds[0] +
+                        Environment.NewLine + bounds[1] +
+                        Environment.NewLine + bounds[2] +
+                        Environment.NewLine + bounds[3]
+                    );
                 }
 
                 if (thermalsListAPI.Count > 0)
