@@ -304,7 +304,7 @@ namespace MSFS_Kinetic_Assistant
             var speed = (location.speed * 1.9).ToString("F3");
             var time = location.time.ToString("HHmmss.ff");
             var date = location.time.ToString("ddmmyy");
-            var ha = location.ha.ToString("0.0");
+            var ha = location.ha.ToString("0.00", CultureInfo.InvariantCulture);
 
             var gga = String.Format("GPGGA,{0},{1},{2},1,12,1,{3},M,,,,", time, lat, lon, alt);
             var gll = String.Format("GPGLL,{0},{1},{2},A", lat, lon, time);

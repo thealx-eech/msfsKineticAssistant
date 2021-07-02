@@ -188,14 +188,14 @@ namespace MSFS_Kinetic_Assistant
     }
     public class Waypoint
     {
-        public Waypoint(int id, GeoLocation loc, string name, string entered, string passed, double fine, double weight, double wind, double altitude, double elevation, double height, double width, bool bottomMeasurement, bool topMeasurement)
+        public Waypoint(int id, GeoLocation loc, string name, string entered, string passed, double fine, double weight, string wind, double altitude, double elevation, double height, double width, bool bottomMeasurement, bool topMeasurement)
         {
             ID = id;
             Location = loc;
             Name = name;
             Entered = entered;
             Passed = passed;
-            Fine = Fine;
+            Fine = fine;
             Weight = weight;
             Wind = wind;
             Altitude = altitude;
@@ -213,7 +213,7 @@ namespace MSFS_Kinetic_Assistant
         public string Passed { get; set; }
         public double Fine { get; set; }
         public double Weight { get; set; }
-        public double Wind { get; set; }
+        public string Wind { get; set; }
         public double Altitude { get; set; }
         public double Elevation { get; set; }
         public double Height { get; set; }

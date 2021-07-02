@@ -20,6 +20,7 @@ namespace MSFS_Kinetic_Assistant
         public List<TrackPoint> trackRecording = null;
         public List<TrackPoint> trackRecorded = null;
         public double recordingCounter = 0;
+        public double lastRecordingCounter = 0;
         const uint TARGETMAX = 99999999;
 
         //public List<TrackPoint> trackPlaying = null;
@@ -99,6 +100,7 @@ namespace MSFS_Kinetic_Assistant
                     Environment.NewLine + " <ele>" + trackPoint.Elevation.ToString(CultureInfo.InvariantCulture) + "</ele>" +
                     Environment.NewLine + " <agl>" + trackPoint.AltitudeAboveGround.ToString() + "</agl>" +
                     Environment.NewLine + " <velocity>" + trackPoint.Velocity.ToString(CultureInfo.InvariantCulture) + "</velocity>" +
+                    Environment.NewLine + " <airspeed>" + trackPoint.Airspeed.ToString(CultureInfo.InvariantCulture) + "</airspeed>" +
                     Environment.NewLine + " <heading>" + trackPoint.Heading + "</heading>" +
                     Environment.NewLine + " <pitch>" + trackPoint.Pitch + "</pitch>" +
                     Environment.NewLine + " <roll>" + trackPoint.Roll + "</roll>" +

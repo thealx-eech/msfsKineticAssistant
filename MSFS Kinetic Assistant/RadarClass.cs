@@ -488,7 +488,13 @@ namespace MSFS_Kinetic_Assistant
                 Label label = new Label();
                 label.Name = "Label_" + sanitizeString(wp.Name) + wp.ID;
                 label.FontSize = 10;
-                label.Content = wp.Name + Environment.NewLine + "MIN: " + wp.Elevation + "ft" + Environment.NewLine + "MAX: " + wp.Height + "ft";
+                string name = wp.Name;
+                if (name.Contains('|'))
+                {
+                    string data = name.Split('|')[1].Trim();
+                    name = name.Split('|')[0].Trim();
+                }
+                label.Content = name + Environment.NewLine + "MIN: " + wp.Elevation + "ft" + Environment.NewLine + "MAX: " + wp.Height + "ft";
                 group.Children.Add(label);
 
                 id++;
