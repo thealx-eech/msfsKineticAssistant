@@ -241,7 +241,7 @@
                 <StackPanel Name="thermalsDebugData" VerticalAlignment="Top" Height="0">
                 </StackPanel>
                 <ScrollViewer Name="messagesLogScroll" VerticalScrollBarVisibility="Visible" Height="90">
-                    <StackPanel Name="messagesLog">
+                    <StackPanel Name="messagesLog" Cursor="Hand" MouseLeftButtonUp="copyLog" ToolTip="Click to copy log into clipboard">
 
                     </StackPanel>
                 </ScrollViewer>
@@ -323,6 +323,7 @@
                                 <ComboBox SelectionChanged="saveSettings" Background="Transparent" Name="towConnectionPoint" Height="26" Margin="0 5 0 0">
                                     <ComboBoxItem>CG hook</ComboBoxItem>
                                     <ComboBoxItem IsSelected="True">Nose hook</ComboBoxItem>
+                                    <ComboBoxItem>Tail bar</ComboBoxItem>
                                 </ComboBox>
                             </StackPanel>
 
@@ -367,11 +368,11 @@
                             </StackPanel>
 
                             <StackPanel Margin="5, 10, 5, 0"  >
-                                <Button IsEnabled="false" Height="26px" x:Name="towConnectButton" Background="#55FFFFFF" Click="toggleTowClosest" Foreground="DarkRed" BorderBrush="DarkRed" Margin="0, 0, 0, 0"  VerticalAlignment="Top">Attach To Closest</Button>
+                                <Button IsEnabled="false" Height="52px" x:Name="towConnectButton" Background="#55FFFFFF" Click="toggleTowClosest" Foreground="DarkRed" BorderBrush="DarkRed" Margin="0, 0, 0, 0"  VerticalAlignment="Top">Attach To Closest</Button>
                                 <ComboBox ItemsSource="{Binding Source={StaticResource AlphaSortedSimvarNamesTowConnect}}" SelectedItem="0" Visibility="Collapsed" Name="connectTowControls" Tag="toggleTowClosest" SelectionChanged="saveSettings" Height="26" Margin="0 13 0 13" HorizontalAlignment="Stretch">
                                 </ComboBox>
 
-                                <Button BorderThickness="0" Click="toggleControlOptions" Margin="0 -26 2 0" Cursor="Hand" Background="Transparent" Width="26px" Height="18px" HorizontalAlignment="Right">
+                                <Button BorderThickness="0" Click="toggleControlOptions" Margin="0 -82 2 0" Cursor="Hand" Background="Transparent" Width="26px" Height="18px" HorizontalAlignment="Right">
                                     <Button.Content>
                                         <Image Source="media/ctrl1.png" Stretch="Uniform"/>
                                     </Button.Content>
@@ -547,7 +548,7 @@
                                 <ImageBrush ImageSource="media/settings.bmp" Opacity="0.1"/>
                             </StackPanel.Background>
 
-                            <ScrollViewer Height="200">
+                            <ScrollViewer Height="240">
                                 <StackPanel Margin="0 0 -3 0" Name="settingsContainer">
                                     <CheckBox x:Name="alwaysOnTop" Visibility="Collapsed"  Click="saveSettings" IsChecked="False">Always on top</CheckBox>
                                     <CheckBox x:Name="transparentBackground" Visibility="Collapsed"  Click="saveSettings" IsChecked="False">Transparent background</CheckBox>
@@ -577,31 +578,31 @@
                                         <TextBlock FontSize="10">
                                             Sounds volume
                                         </TextBlock>
-                                        <Slider Style="{StaticResource Horizontal_Slider}" x:Name="soundsVolume" ValueChanged="saveSettings"  Minimum="0" Maximum="100" Value="50" AutoToolTipPlacement="BottomRight" AutoToolTipPrecision="0"  ></Slider>
+                                        <Slider Margin="0, -6, 0, -6" Style="{StaticResource Horizontal_Slider}" x:Name="soundsVolume" ValueChanged="saveSettings"  Minimum="0" Maximum="100" Value="50" AutoToolTipPlacement="BottomRight" AutoToolTipPrecision="0"  ></Slider>
                                     </StackPanel>
 
                                     <StackPanel Margin="3, 5, 5, 0"  >
                                         <TextBlock FontSize="10">
                                             Winch/tow rope elasticity (% of Length)
                                         </TextBlock>
-                                        <Slider Style="{StaticResource Horizontal_Slider}" x:Name="elasticExtension" ValueChanged="saveSettings"  Minimum="1" Maximum="5" Value="3" AutoToolTipPlacement="BottomRight" AutoToolTipPrecision="0"  ></Slider>
+                                        <Slider Margin="0, -6, 0, -6"  Style="{StaticResource Horizontal_Slider}" x:Name="elasticExtension" ValueChanged="saveSettings"  Minimum="1" Maximum="5" Value="3" AutoToolTipPlacement="BottomRight" AutoToolTipPrecision="0"  ></Slider>
                                     </StackPanel>
 
                                     <StackPanel Margin="3, 5, 5, 0"  >
                                         <TextBlock FontSize="10">
                                             Winch initial Acceleration (s)
                                         </TextBlock>
-                                        <Slider Style="{StaticResource Horizontal_Slider}" x:Name="winchSpeedUp" ValueChanged="saveSettings"  Minimum="5" Maximum="15" Value="10" AutoToolTipPlacement="BottomRight" AutoToolTipPrecision="0"  ></Slider>
+                                        <Slider Margin="0, -6, 0, -6"  Style="{StaticResource Horizontal_Slider}" x:Name="winchSpeedUp" ValueChanged="saveSettings"  Minimum="5" Maximum="15" Value="10" AutoToolTipPlacement="BottomRight" AutoToolTipPrecision="0"  ></Slider>
                                     </StackPanel>
 
-                                    <StackPanel Margin="3, 10, 5, 0">
+                                    <StackPanel Margin="3, 5, 5, 0">
                                         <ComboBox FontSize="12" x:Name="nmeaServer" SelectionChanged="saveSettings"  ToolTip="Set selected IP and port 10110 in the XCSoar client" >
                                             <ComboBoxItem IsSelected="true">XCSoar server: disabled</ComboBoxItem>
                                             <ComboBoxItem Tag="127.0.0.1">XCSoar server: 127.0.0.1</ComboBoxItem>
                                         </ComboBox>
                                     </StackPanel>
 
-                                    <StackPanel Margin="3, 10, 5, 0">
+                                    <StackPanel Margin="3, 5, 5, 0">
                                         <ComboBox FontSize="12" x:Name="panelServer" SelectionChanged="saveSettings">
                                             <ComboBoxItem IsSelected="true" Tag="0">Ingame panel: disabled</ComboBoxItem>
                                             <ComboBoxItem Tag="4">Ingame panel: enabled</ComboBoxItem>
@@ -611,36 +612,35 @@
                                 </StackPanel>
                             </ScrollViewer>
 
-                            <TextBlock TextWrapping="Wrap" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="5, 10, 5, 0">
-                                News, updates and reviews at:
-                            </TextBlock>
-                            <TextBlock TextWrapping="Wrap" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="5, 0, 5, 0">
-                                <Hyperlink NavigateUri="https://www.facebook.com/touching.cloud2020" RequestNavigate="Hyperlink_RequestNavigate">
-                                    facebook.com/touching.cloud2020
-                                </Hyperlink>
-                            </TextBlock>
-                            <TextBlock ToolTip="Left click - open website, Right click - reset counter" TextWrapping="Wrap" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="5, 0, 5, 0">
-                                <Hyperlink NavigateUri="https://msfs.touching.cloud/news/" RequestNavigate="Hyperlink_RequestNavigate" MouseRightButtonDown="resetMissedUpdates">
-                                    MSFS.Touching.Cloud <TextBlock Foreground="DarkRed" Name="newsLink"></TextBlock>
-                                </Hyperlink>
-                            </TextBlock>
-                            <TextBlock TextWrapping="Wrap" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="5, 0, 5, 0">
-                                <Hyperlink NavigateUri="https://secure.simmarket.com/touching-cloud-msfs-cloud-assistant.phtml" RequestNavigate="Hyperlink_RequestNavigate">
-                                    SimMarket.com
-                                </Hyperlink>
-                            </TextBlock>
+                            <ScrollViewer Name="credits" VerticalScrollBarVisibility="Disabled">
+                                <StackPanel>
+                                    <TextBlock TextWrapping="Wrap" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="5, 0, 5, 0">
+                                        Updates, reviews and support:
+                                    </TextBlock>
+                                    <TextBlock TextWrapping="Wrap" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="5, 0, 5, 0">
+                                        <Hyperlink NavigateUri="https://www.facebook.com/touching.cloud2020" RequestNavigate="Hyperlink_RequestNavigate">
+                                            facebook.com/touching.cloud2020
+                                        </Hyperlink>
+                                    </TextBlock>
+                                    <TextBlock ToolTip="Left click - open website, Right click - reset counter" TextWrapping="Wrap" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="5, 0, 5, 0">
+                                        <Hyperlink NavigateUri="https://msfs.touching.cloud/news/" RequestNavigate="Hyperlink_RequestNavigate" MouseRightButtonDown="resetMissedUpdates">
+                                            MSFS.Touching.Cloud <TextBlock Foreground="DarkRed" Name="newsLink"></TextBlock>
+                                        </Hyperlink>
+                                    </TextBlock>
+                                    <TextBlock TextWrapping="Wrap" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="5, 0, 5, 0">
+                                        <Hyperlink NavigateUri="https://secure.simmarket.com/touching-cloud-msfs-cloud-assistant.phtml" RequestNavigate="Hyperlink_RequestNavigate">
+                                            SimMarket.com
+                                        </Hyperlink>
+                                    </TextBlock>
 
 
-                            <TextBlock TextWrapping="Wrap" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="5, 5, 5, 0">
-                                Events and support:
-                            </TextBlock>
-                            <TextBlock TextWrapping="Wrap" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0, 0, 0, 0">
-                                <Hyperlink NavigateUri="https://discord.gg/6rueC2c8qc" RequestNavigate="Hyperlink_RequestNavigate">
-                                    ALBATROSS &#38; TouchingCloud Discord
-                                </Hyperlink>
-                            </TextBlock>
-
-
+                                    <TextBlock TextWrapping="Wrap" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0, 0, 0, 0">
+                                        <Hyperlink NavigateUri="https://discord.gg/6rueC2c8qc" RequestNavigate="Hyperlink_RequestNavigate">
+                                            ALBATROSS &#38; TouchingCloud Discord
+                                        </Hyperlink>
+                                    </TextBlock>
+                                </StackPanel>
+                            </ScrollViewer>
                         </StackPanel>
                     </TabItem>
                 </TabControl>

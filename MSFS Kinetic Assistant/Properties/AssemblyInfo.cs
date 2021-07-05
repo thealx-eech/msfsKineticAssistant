@@ -10,7 +10,7 @@ using System.Windows;
 [assembly: AssemblyTitle("Kinetic Assistant")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("Touching Cloud")]
+[assembly: AssemblyCompany("TouchingCloud")]
 [assembly: AssemblyProduct("Kinetic Assistant")]
 [assembly: AssemblyCopyright("Copyright ©  2021")]
 [assembly: AssemblyTrademark("")]
@@ -51,5 +51,5 @@ using System.Windows;
 // You can specify all the values or you can default the Build and Revision Numbers
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("0.10.2.0")]
-[assembly: AssemblyFileVersion("0.10.2.0")]
+[assembly: AssemblyVersion("0.10.3.0")]
+[assembly: AssemblyFileVersion("0.10.3.0")]

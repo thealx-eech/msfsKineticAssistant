@@ -246,6 +246,7 @@ namespace MSFS_Kinetic_Assistant
                 link.NavigateUri = new Uri(path);
                 link.RequestNavigate += Hyperlink_RequestNavigate;
                 link.Inlines.Add("Install Kinetic Panel");
+                link.ToolTip = "Extract kinetic-panel folder into Community";
                 link.FontSize = 14;
                 txt.HorizontalAlignment = HorizontalAlignment.Center;
                 txt.Inlines.Add(link);
@@ -584,7 +585,7 @@ namespace MSFS_Kinetic_Assistant
                         _winchPosition = _mathClass.getWinchPosition(_planeInfoResponse, cableLength - 10);
 
                         Application.Current.Dispatcher.Invoke(() => _radarClass.InsertWinch(RadarCanvas));
-                        Application.Current.Dispatcher.Invoke(() => RadarScale.Value = Math.Min(maxRadarScale, cableLength / 1000 * 1.2));
+                        Application.Current.Dispatcher.Invoke(() => setRadarScale(cableLength / 1000 * 1.2));
 
                         Console.WriteLine($"Current location: {_planeInfoResponse.Latitude * 180 / Math.PI} {_planeInfoResponse.Longitude * 180 / Math.PI}");
                         Console.WriteLine($"Winch location: {_winchPosition.location.Latitude * 180 / Math.PI} {_winchPosition.location.Longitude * 180 / Math.PI}");
@@ -786,13 +787,13 @@ namespace MSFS_Kinetic_Assistant
             }
 
 
-            if (type == "Tow" && (towCableLength > towCableDesired || towCableLength < towCableDesired - 1))
+            if (type == "Tow" && (towCableLength > towCableDesired * (connectionPoint == 2 ? 0.2 : 1) || towCableLength < towCableDesired * (connectionPoint == 2 ? 0.2 : 1) - 1))
             {
-                Console.WriteLine("Shortening tow rope from " + towCableLength + " to " + towCableDesired);
+                Console.WriteLine("Shortening tow rope from " + towCableLength + " to " + towCableDesired * (connectionPoint == 2 ? 0.2 : 1));
 
-                towCableLength -= lastFrameTiming * (towCableLength > towCableDesired ? 1 : -1);
-                towPrevDist -= lastFrameTiming * (towCableLength > towCableDesired ? 1 : -1);
-                towPrePrevDist -= lastFrameTiming * (towCableLength > towCableDesired ? 1 : -1);
+                towCableLength -= lastFrameTiming * (towCableLength > towCableDesired * (connectionPoint == 2 ? 0.2 : 1) ? 1 : -1);
+                towPrevDist -= lastFrameTiming * (towCableLength > towCableDesired * (connectionPoint == 2 ? 0.2 : 1) ? 1 : -1);
+                towPrePrevDist -= lastFrameTiming * (towCableLength > towCableDesired * (connectionPoint == 2 ? 0.2 : 1) ? 1 : -1);
             }
 
             //Console.WriteLine($"{type}: {bodyAcceleration / 9.81:F2}g {(type == "Winch" ? cableLength : towCableLength):F2}m / {_winchDirection.distance:F2}m h{(_winchDirection.heading * 180 / Math.PI):F0}deg p{(_winchDirection.pitch * 180 / Math.PI):F0}deg");
@@ -839,6 +840,13 @@ namespace MSFS_Kinetic_Assistant
 
                 if (bodyAcceleration > accelThreshold && connectionPoint != 0 && (Math.Abs(_winchDirection.pitch) > degreeThershold || Math.Abs(_winchDirection.heading) > degreeThershold))
                 {
+                    if (type == "Tow" && connectionPoint == 2)
+                    {
+                        _winchDirection.heading += Math.PI;
+                        while (_winchDirection.heading > Math.PI) { _winchDirection.heading -= 2 * Math.PI; }
+                        while (_winchDirection.heading < -Math.PI) { _winchDirection.heading += 2 * Math.PI; }
+                    }
+
                     double rotationForce = 10 * (bodyAcceleration - accelThreshold) / accelerationLimit;
 
                     double sinHeading = Math.Sign(_winchDirection.heading) * Math.Pow(Math.Abs(Math.Sin(_winchDirection.heading / 2)), 1.5);
@@ -897,7 +905,7 @@ namespace MSFS_Kinetic_Assistant
                     Application.Current.Dispatcher.Invoke(() => changeButtonStatus(false, towToggleButton, true, "STOP"));
                     Application.Current.Dispatcher.Invoke(() => changeButtonStatus(true, towConnectButton, true, "Attach To Closest"));
 
-                    toggleSidebarWindow(true);
+                    Application.Current.Dispatcher.Invoke(() => toggleSidebarWindow(true));
                 }
                 else // STOP SEARCH
                 {
@@ -977,9 +985,7 @@ namespace MSFS_Kinetic_Assistant
 
             if (RadarScale.Value < menuValue)
             {
-                RadarScale.Value = menuValue;
-                assistantSettings["RadarScale"] = RadarScale.Value;
-                saveSettings(RadarScale, null);
+                setRadarScale(menuValue);
             }
 
             insertedTowPlane = new KeyValuePair<uint, bool>(id, true);
@@ -1357,7 +1363,7 @@ namespace MSFS_Kinetic_Assistant
             if (_nearbyInfoResponse.ContainsKey(towingTarget))
             {
                 // BLINK LIGHTS
-                if (towingTarget != insertedTowPlane.Key && absoluteTime - lightToggled > 1.5)
+                if (towingTarget != insertedTowPlane.Key && absoluteTime - lightToggled > 2.5)
                 {
                     lightToggled = absoluteTime;
                     _planeAvionicsResponse.LIGHTLANDING = _planeAvionicsResponse.LIGHTLANDING == 100 ? 0 : 100;
@@ -2005,6 +2011,7 @@ namespace MSFS_Kinetic_Assistant
                 //showMessage("Thermals enabled", _fsConnect);
                 Application.Current.Dispatcher.Invoke(() => playSound("true"));
                 Application.Current.Dispatcher.Invoke(() => changeButtonStatus(false, thermalsToggleButton, true, "Disable thermals"));
+                Application.Current.Dispatcher.Invoke(() => toggleSidebarWindow(true));
             }
         }
         private void processThermals(List<winchPosition> list, bool API = false)
@@ -3027,7 +3034,7 @@ namespace MSFS_Kinetic_Assistant
                     TransparentIcon.Content = getIconImage(transparentBackground.IsChecked == true, (TransparentIcon.Tag.ToString()));
 
                     enableApiThermals(APIthermalsButton, assistantSettings.ContainsKey("APIthermalsAutoload") && assistantSettings["APIthermalsAutoload"] == 1);
-                    toggleSidebarWindow(assistantSettings.ContainsKey("sidebarActive") && assistantSettings["sidebarActive"] == 1);
+                    //toggleSidebarWindow(assistantSettings.ContainsKey("sidebarActive") && assistantSettings["sidebarActive"] == 1);
 
                     TowPlaneTrackContainer.Visibility = assistantSettings.ContainsKey("towType") && assistantSettings["towType"] == 1 ? Visibility.Visible : Visibility.Collapsed;
                     towInsertContainer.Visibility = assistantSettings.ContainsKey("towType") && assistantSettings["towType"] == 1 ? Visibility.Visible : Visibility.Collapsed;
@@ -3286,8 +3293,9 @@ namespace MSFS_Kinetic_Assistant
 
         private void toggleSidebar(object sender, RoutedEventArgs e)
         {
-            sidebarActive.IsChecked = !sidebarActive.IsChecked;
-            saveSettings(sidebarActive, null);
+            //sidebarActive.IsChecked = !sidebarActive.IsChecked;
+            //saveSettings(sidebarActive, null);
+            toggleSidebarWindow();
         }
         private void toggleMainbar(object sender, RoutedEventArgs e)
         {
@@ -3584,16 +3592,12 @@ namespace MSFS_Kinetic_Assistant
                 towType.SelectedIndex = 1;
                 if (RadarScale.Value < 0.2)
                 {
-                    RadarScale.Value = 0.2;
-                    assistantSettings["RadarScale"] = RadarScale.Value;
+                    setRadarScale(0.2);
                 }
-                saveSettings(towType, null);
             }
             else if (assistantSettings["RadarScale"] < 5)
             {
-                RadarScale.Value = 5;
-                assistantSettings["RadarScale"] = 5;
-                saveSettings(RadarScale, null);
+                setRadarScale(5);
             }
 
             _trackingClass.ghostTeleport = new winchPosition();
@@ -3855,9 +3859,31 @@ namespace MSFS_Kinetic_Assistant
         }
         // HTTP ENDS
 
+        void setRadarScale(double zoomResult)
+        {
+            if (zoomResult != 0)
+            {
+                RadarScale.Value = Math.Min(maxRadarScale, zoomResult);
+            }
+        }
+
         void radarZoom(object sender, MouseWheelEventArgs e)
         {
             RadarScale.Value = Math.Min(maxRadarScale, RadarScale.Value - 0.01 * e.Delta);
+        }
+
+        void copyLog(object sender, MouseButtonEventArgs e)
+        {
+            string text = "";
+
+            messagesLog.Children.Insert(0, makeTextBlock(DateTime.UtcNow.ToString("u") + ": log copied to clipboard", Colors.Black, 10, TextWrapping.Wrap));
+
+            foreach (TextBlock txt in messagesLog.Children)
+            {
+                text += txt.Text + Environment.NewLine;
+            }
+
+            Clipboard.SetText(text);
         }
     }
 }

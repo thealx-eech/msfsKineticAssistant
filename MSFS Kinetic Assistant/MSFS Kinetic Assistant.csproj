@@ -75,7 +75,7 @@
     <Prefer32Bit>true</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup>
-    <ApplicationIcon>logo-l.ico</ApplicationIcon>
+    <ApplicationIcon>touchcloud-icon-l.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Accord, Version=3.8.0.0, Culture=neutral, PublicKeyToken=fa1a88e29555ccf7, processorArchitecture=MSIL">
@@ -211,6 +211,7 @@
     <Resource Include="MEDIA\ctrl2.png" />
   </ItemGroup>
   <ItemGroup>
+    <Resource Include="touchcloud-icon-l.ico" />
     <Resource Include="MEDIA\winchIcon.png" />
     <Resource Include="MEDIA\wp.png" />
     <Resource Include="MEDIA\close.png" />
