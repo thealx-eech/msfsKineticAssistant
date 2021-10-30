@@ -373,7 +373,7 @@ namespace MSFS_Kinetic_Assistant
 
                 Label label = new Label();
                 label.Name = "Label_" + lbl + "_" + id;
-                label.FontSize = 10;
+                label.FontSize = 12;
                 label.Content = Math.Round(thermalsList[id].airspeed) + "m/s" + (thermalsList[id].alt > 1000 ? Environment.NewLine + (thermalsList[id].alt / 0.305).ToString("0") + "ft AGL" : "");
                 label.Foreground = new SolidColorBrush(Colors.DarkRed);
                 group.Children.Add(label);

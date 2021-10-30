@@ -48,9 +48,10 @@ namespace MSFS_Kinetic_Assistant
         private PlaneAvionicsResponse _planeAvionicsResponse;
         private PlaneAvionicsResponse _planeAvionicsResponseLast;
 
-        private PlaneInfoRotate _planeRotate;
+        private PlaneInfoRotateVelocity _planeRotateVelocity;
         private PlaneEngineData _planeEngineData;
         private PlaneInfoRotateAccel _planeRotateAccel;
+        private ThermalVelocity _planeVerticalVelocity;
 
         private Dictionary<uint, winchPosition> _nearbyInfoResponse;
         private Dictionary<uint, winchPosition> _nearbyInfoResponseLast;
@@ -66,6 +67,7 @@ namespace MSFS_Kinetic_Assistant
         private double cableLength = 0;
         private double cableLengthPrev = 0;
         private double cableLengthPrePrev = 0;
+        private double cabelTensionPrev = 0;
 
         // IF NOT 0 - ARRESTER CONNECTED
         private double arrestorConnectedTime = 0;
@@ -136,6 +138,7 @@ namespace MSFS_Kinetic_Assistant
         DispatcherTimer launchTimer;
         DispatcherTimer nearbyTimer;
         private double lastPreparePressed = 0;
+        double te_raw_ms = 0;
 
         string optPath;
         string plnPath;
@@ -668,13 +671,13 @@ namespace MSFS_Kinetic_Assistant
 
                 // GET DRAFT CABLE TENSION
                 double accelerationLimit = (assistantSettings["realisticFailures"] == 1 ? 6 : 30) * 9.81;
-                double cableTension = _mathClass.getCableTension(cableLength, Math.Max(1, assistantSettings["elasticExtension"] / 2), _winchDirection);
+                double cableTension = _mathClass.getCableTension(cableLength, Math.Max(1, assistantSettings["elasticExtension"]), _winchDirection);
 
                 // SHORTEN THE STRING
                 if (launchTime != 0 && launchTime - absoluteTime < 0 && cableLength > 10)
                 {
-                    double pitchCompensation = Math.Pow(Math.Abs(Math.Cos(_winchDirection.climbAngle)), 1.25);
-                    double tensionMultiplier = 1 - Math.Pow(Math.Min(1, cableTension / 2), 2);
+                    double pitchCompensation = 1;// Math.Pow(Math.Abs(Math.Cos(_winchDirection.climbAngle)), 1.25);
+                    double tensionMultiplier = 1.5 - Math.Pow(cableTension, 2);
 
                     double timePassed = -launchTime + absoluteTime;
                     double StartTime = Math.Max(assistantSettings["winchSpeedUp"], 3);
@@ -688,9 +691,12 @@ namespace MSFS_Kinetic_Assistant
                         cableLength -= tensionMultiplier * pitchCompensation * targetVelocity * lastFrameTiming;
                     }
 
-                    // GET FINAL CABLE TENSION
-                    cableTension = _mathClass.getCableTension(cableLength, Math.Max(1, assistantSettings["elasticExtension"] / 2), _winchDirection);
                 }
+
+                // GET FINAL CABLE TENSION
+                cableTension = 0.2 * cabelTensionPrev + 0.4 * cableTension + 0.4 * _mathClass.getCableTension(cableLength, Math.Max(1, assistantSettings["elasticExtension"]), _winchDirection);
+
+                cabelTensionPrev = cableTension;
 
                 // LEVEL UP GLIDER BEFORE LAUNCH
                 levelUpGlider();
@@ -726,17 +732,17 @@ namespace MSFS_Kinetic_Assistant
         {
             if (_planeAvionicsResponse.SimOnGround == 100 && _planeInfoResponse.GpsGroundSpeed < 5)
             {
-                _planeRotate.RotationVelocityBodyX = 0;
-                _planeRotate.RotationVelocityBodyY = _planeAvionicsResponse.RudderPosition / 500 * lastFrameTiming;
-                _planeRotate.RotationVelocityBodyZ = -Math.Sin(_planeInfoResponse.PlaneBank) * Math.Pow(Math.Abs(Math.Sin(_planeInfoResponse.PlaneBank)), 0.5);
+                _planeRotateVelocity.RotationVelocityBodyX = 0;
+                _planeRotateVelocity.RotationVelocityBodyY = _planeAvionicsResponse.RudderPosition / 200 * lastFrameTiming;
+                _planeRotateVelocity.RotationVelocityBodyZ = -Math.Sin(_planeInfoResponse.PlaneBank) * Math.Pow(Math.Abs(Math.Sin(_planeInfoResponse.PlaneBank)), 0.5);
 
-                //Console.WriteLine($"Leveling {_planeRotate.RotationVelocityBodyZ:F5}");
+                //Console.WriteLine($"Leveling {_planeRotateVelocity.RotationVelocityBodyZ:F5}");
 
-                if (!double.IsNaN(_planeRotate.RotationVelocityBodyX) && !double.IsNaN(_planeRotate.RotationVelocityBodyY) && !double.IsNaN(_planeRotate.RotationVelocityBodyZ))
+                if (!double.IsNaN(_planeRotateVelocity.RotationVelocityBodyX) && !double.IsNaN(_planeRotateVelocity.RotationVelocityBodyY) && !double.IsNaN(_planeRotateVelocity.RotationVelocityBodyZ))
                 {
                     try
                     {
-                        _fsConnect.UpdateData(Definitions.PlaneRotate, _planeRotate);
+                        _fsConnect.UpdateData(Definitions.PlaneRotationVelocity, _planeRotateVelocity);
                     }
                     catch (Exception ex)
                     {
@@ -748,8 +754,8 @@ namespace MSFS_Kinetic_Assistant
                 {
                     double pushSpeed = 0.5 * _planeInfoResponse.GpsGroundSpeed + 0.5 * Math.Min(2, Math.Max(-2, -_planeAvionicsResponse.YokeYPosition / 25));
                     _planeCommit.VelocityBodyX = 0;
-                    _planeCommit.VelocityBodyY = pushSpeed * Math.Sin(_planeInfoResponse.PlanePitch);
-                    _planeCommit.VelocityBodyZ = pushSpeed;
+                    _planeCommit.VelocityBodyY = _planeInfoResponse.VelocityBodyY + _planeInfoResponse.AccelerationBodyY * lastFrameTiming * lastFrameTiming;
+                    _planeCommit.VelocityBodyZ = _planeInfoResponse.AccelerationBodyZ * lastFrameTiming + pushSpeed;
 
                     if (!double.IsNaN(_planeCommit.VelocityBodyX) && !double.IsNaN(_planeCommit.VelocityBodyY) && !double.IsNaN(_planeCommit.VelocityBodyZ))
                     {
@@ -829,50 +835,138 @@ namespace MSFS_Kinetic_Assistant
             {
                 _planeCommit.VelocityBodyX += _winchDirection.localForceDirection.X * bodyAcceleration * lastFrameTiming;
                 _mathClass.restrictAirspeed(_planeCommit.VelocityBodyX, targetVelocity, lastFrameTiming);
-                _planeCommit.VelocityBodyY += _winchDirection.localForceDirection.Y * bodyAcceleration * lastFrameTiming;
+                _planeCommit.VelocityBodyY += (_planeInfoResponse.AccelerationBodyY + _winchDirection.localForceDirection.Y * bodyAcceleration) * lastFrameTiming;
                 _mathClass.restrictAirspeed(_planeCommit.VelocityBodyY, targetVelocity, lastFrameTiming);
-                _planeCommit.VelocityBodyZ += _winchDirection.localForceDirection.Z * bodyAcceleration * lastFrameTiming;
+                _planeCommit.VelocityBodyZ += (_planeInfoResponse.AccelerationBodyZ + _winchDirection.localForceDirection.Z * bodyAcceleration) * lastFrameTiming;
                 _mathClass.restrictAirspeed(_planeCommit.VelocityBodyZ, targetVelocity, lastFrameTiming);
 
-                // PROCESS NOSE CONNECTION POINT
-                double degreeThershold = (_planeAvionicsResponse.SimOnGround == 0 ? 20 : 1) * Math.PI / 180;
-                double accelThreshold = 9.81 / (_planeAvionicsResponse.SimOnGround == 0 ? 5 : 50);
+                // APPLY ROTATION FORCES
+                //double degreeThershold = (_planeAvionicsResponse.SimOnGround == 0 ? 20 : 1) * Math.PI / 180;
+                double accelThreshold = 9.81 / (_planeAvionicsResponse.SimOnGround == 0 ? 1000 : 50);
 
-                if (bodyAcceleration > accelThreshold && connectionPoint != 0 && (Math.Abs(_winchDirection.pitch) > degreeThershold || Math.Abs(_winchDirection.heading) > degreeThershold))
+                if (bodyAcceleration > accelThreshold /*&& (Math.Abs(_winchDirection.pitch) > degreeThershold || Math.Abs(_winchDirection.heading) > degreeThershold)*/)
                 {
-                    if (type == "Tow" && connectionPoint == 2)
+                    // CG CONNECTION
+                    if (connectionPoint == 0)
                     {
-                        _winchDirection.heading += Math.PI;
-                        while (_winchDirection.heading > Math.PI) { _winchDirection.heading -= 2 * Math.PI; }
-                        while (_winchDirection.heading < -Math.PI) { _winchDirection.heading += 2 * Math.PI; }
-                    }
+                        _winchDirection.pitch += Math.PI/6;
+                        while (_winchDirection.pitch > Math.PI) { _winchDirection.pitch -= 2 * Math.PI; }
+                        while (_winchDirection.pitch < -Math.PI) { _winchDirection.pitch += 2 * Math.PI; }
 
-                    double rotationForce = 10 * (bodyAcceleration - accelThreshold) / accelerationLimit;
+                        double rotationForce = 10 * (bodyAcceleration - accelThreshold) / accelerationLimit;
 
-                    double sinHeading = Math.Sign(_winchDirection.heading) * Math.Pow(Math.Abs(Math.Sin(_winchDirection.heading / 2)), 1.5);
-                    double sinPitch = Math.Sign(_winchDirection.pitch) * Math.Pow(Math.Abs(Math.Sin(_winchDirection.pitch / 2)), 1.5);
+                        double sinHeading = Math.Sign(_winchDirection.heading) * Math.Pow(Math.Abs(Math.Sin(_winchDirection.heading)), 1.5);
+                        double sinPitch = Math.Sign(_winchDirection.pitch) * Math.Pow(Math.Abs(Math.Sin(_winchDirection.pitch)), 1.5);
 
-                    //Console.WriteLine("Math.Sign(_winchDirection.pitch)" + Math.Sign(_winchDirection.pitch) + " Math.Sin(_winchDirection.pitch / 2):" + Math.Sin(_winchDirection.pitch / 2) + " Math.Pow(Math.Sin(_winchDirection.pitch / 2), 1.5):" + Math.Pow(Math.Sin(_winchDirection.pitch / 2), 1.5));
-                    //Console.WriteLine("_planeRotate.RotationVelocityBodyX:" + _planeRotate.RotationVelocityBodyX + " rotationForce:" + rotationForce + " rotationForce:" + rotationForce + " sinPitch:" + sinPitch + " lastFrameTiming:" + lastFrameTiming);
+                        //Console.WriteLine("Math.Sign(_winchDirection.pitch)" + Math.Sign(_winchDirection.pitch) + " Math.Sin(_winchDirection.pitch / 2):" + Math.Sin(_winchDirection.pitch / 2) + " Math.Pow(Math.Sin(_winchDirection.pitch / 2), 1.5):" + Math.Pow(Math.Sin(_winchDirection.pitch / 2), 1.5));
+                        //Console.WriteLine("_planeRotateVelocity.RotationVelocityBodyX:" + _planeRotateVelocity.RotationVelocityBodyX + " rotationForce:" + rotationForce + " rotationForce:" + rotationForce + " sinPitch:" + sinPitch + " lastFrameTiming:" + lastFrameTiming);
 
-                    _planeRotateAccel.RotationAccelerationBodyX += -rotationForce * sinPitch * lastFrameTiming;
-                    _planeRotateAccel.RotationAccelerationBodyY += (_planeAvionicsResponse.SimOnGround == 0 ? rotationForce : 10 * Math.Pow(Math.Abs(rotationForce / 10), 0.1)) * sinHeading
-                        * lastFrameTiming;
-                    _planeRotateAccel.RotationAccelerationBodyZ += (lastFrameTiming * rotationForce * sinHeading) * lastFrameTiming;
+                        //Console.WriteLine($"rotationForce {rotationForce:F2} Pitch {_winchDirection.pitch:F2} Heading {_winchDirection.heading:F2}");
 
-                    //Console.WriteLine($"Pitch {_planeRotateAccel.RotationAccelerationBodyX:F2} Heading {_planeRotateAccel.RotationAccelerationBodyY:F2}");
-
-                    if (!double.IsNaN(_planeRotateAccel.RotationAccelerationBodyX) && Math.Abs(_planeRotateAccel.RotationAccelerationBodyX) < 1000 &&
-                        !double.IsNaN(_planeRotateAccel.RotationAccelerationBodyY) && Math.Abs(_planeRotateAccel.RotationAccelerationBodyY) < 1000 &&
-                        !double.IsNaN(_planeRotateAccel.RotationAccelerationBodyZ) && Math.Abs(_planeRotateAccel.RotationAccelerationBodyZ) < 1000)
-                    {
-                        try
+                        if (_planeAvionicsResponse.SimOnGround == 100)
                         {
-                            _fsConnect.UpdateData(Definitions.PlaneRotateAccel, _planeRotateAccel);
+                            _planeRotateVelocity.RotationVelocityBodyX = -rotationForce * sinPitch / 10 * lastFrameTiming;
+                            _planeRotateVelocity.RotationVelocityBodyY = 10 * rotationForce * sinHeading * lastFrameTiming;
+                            _planeRotateVelocity.RotationVelocityBodyZ = lastFrameTiming * rotationForce * sinHeading * lastFrameTiming;
+
+                            if (!double.IsNaN(_planeRotateVelocity.RotationVelocityBodyX) && Math.Abs(_planeRotateVelocity.RotationVelocityBodyX) < 1000 &&
+                                !double.IsNaN(_planeRotateVelocity.RotationVelocityBodyY) && Math.Abs(_planeRotateVelocity.RotationVelocityBodyY) < 1000 &&
+                                !double.IsNaN(_planeRotateVelocity.RotationVelocityBodyZ) && Math.Abs(_planeRotateVelocity.RotationVelocityBodyZ) < 1000)
+                            {
+                                try
+                                {
+                                    _fsConnect.UpdateData(Definitions.PlaneRotationVelocity, _planeRotateVelocity);
+                                }
+                                catch (Exception ex)
+                                {
+                                    addLogMessage(ex.Message);
+                                }
+                            }
                         }
-                        catch (Exception ex)
+                        else
                         {
-                            addLogMessage(ex.Message);
+                            _planeRotateAccel.RotationAccelerationBodyX += -100 * rotationForce * sinPitch;
+                            _planeRotateAccel.RotationAccelerationBodyY += 20 * rotationForce * sinHeading;
+                            _planeRotateAccel.RotationAccelerationBodyZ += 100 * rotationForce * sinHeading;
+
+                            //Console.WriteLine($"Pitch {_planeRotateAccel.RotationAccelerationBodyX:F2} Heading {_planeRotateAccel.RotationAccelerationBodyY:F2}");
+
+                            if (!double.IsNaN(_planeRotateAccel.RotationAccelerationBodyX) && Math.Abs(_planeRotateAccel.RotationAccelerationBodyX) < 1000 &&
+                                !double.IsNaN(_planeRotateAccel.RotationAccelerationBodyY) && Math.Abs(_planeRotateAccel.RotationAccelerationBodyY) < 1000 &&
+                                !double.IsNaN(_planeRotateAccel.RotationAccelerationBodyZ) && Math.Abs(_planeRotateAccel.RotationAccelerationBodyZ) < 1000)
+                            {
+                                try
+                                {
+                                    _fsConnect.UpdateData(Definitions.PlaneRotateAccel, _planeRotateAccel);
+                                }
+                                catch (Exception ex)
+                                {
+                                    addLogMessage(ex.Message);
+                                }
+                            }
+                        }
+                    }
+                    // NOSE/TAIL CONNECTION
+                    else
+                    {
+                        if (connectionPoint == 2) // 
+                        {
+                            _winchDirection.heading += Math.PI;
+                            while (_winchDirection.heading > Math.PI) { _winchDirection.heading -= 2 * Math.PI; }
+                            while (_winchDirection.heading < -Math.PI) { _winchDirection.heading += 2 * Math.PI; }
+                        }
+
+                        double rotationForce = 10 * (bodyAcceleration - accelThreshold) / accelerationLimit;
+
+                        double sinHeading = Math.Sign(_winchDirection.heading) * Math.Pow(Math.Abs(Math.Sin(_winchDirection.heading)), 1.5);
+                        double sinPitch = Math.Sign(_winchDirection.pitch) * Math.Pow(Math.Abs(Math.Sin(_winchDirection.pitch)), 1.5);
+
+                        //Console.WriteLine("Math.Sign(_winchDirection.pitch)" + Math.Sign(_winchDirection.pitch) + " Math.Sin(_winchDirection.pitch / 2):" + Math.Sin(_winchDirection.pitch / 2) + " Math.Pow(Math.Sin(_winchDirection.pitch / 2), 1.5):" + Math.Pow(Math.Sin(_winchDirection.pitch / 2), 1.5));
+                        //Console.WriteLine("_planeRotateVelocity.RotationVelocityBodyX:" + _planeRotateVelocity.RotationVelocityBodyX + " rotationForce:" + rotationForce + " rotationForce:" + rotationForce + " sinPitch:" + sinPitch + " lastFrameTiming:" + lastFrameTiming);
+
+                        //Console.WriteLine($"rotationForce {rotationForce:F2} Pitch {_winchDirection.pitch:F2} Heading {_winchDirection.heading:F2}");
+
+                        if (_planeAvionicsResponse.SimOnGround == 100)
+                        {
+                            _planeRotateVelocity.RotationVelocityBodyX = -rotationForce * sinPitch / 10 * lastFrameTiming;
+                            _planeRotateVelocity.RotationVelocityBodyY = 25 * rotationForce * sinHeading * lastFrameTiming;
+                            _planeRotateVelocity.RotationVelocityBodyZ = lastFrameTiming * rotationForce * sinHeading * lastFrameTiming;
+
+                            if (!double.IsNaN(_planeRotateVelocity.RotationVelocityBodyX) && Math.Abs(_planeRotateVelocity.RotationVelocityBodyX) < 1000 &&
+                                !double.IsNaN(_planeRotateVelocity.RotationVelocityBodyY) && Math.Abs(_planeRotateVelocity.RotationVelocityBodyY) < 1000 &&
+                                !double.IsNaN(_planeRotateVelocity.RotationVelocityBodyZ) && Math.Abs(_planeRotateVelocity.RotationVelocityBodyZ) < 1000)
+                            {
+                                try
+                                {
+                                    _fsConnect.UpdateData(Definitions.PlaneRotationVelocity, _planeRotateVelocity);
+                                }
+                                catch (Exception ex)
+                                {
+                                    addLogMessage(ex.Message);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            _planeRotateAccel.RotationAccelerationBodyX += - 250 * rotationForce * sinPitch;
+                            _planeRotateAccel.RotationAccelerationBodyY += 250 * rotationForce * sinHeading;
+                            _planeRotateAccel.RotationAccelerationBodyZ += 10 * rotationForce * sinHeading;
+
+                            //Console.WriteLine($"Pitch {_planeRotateAccel.RotationAccelerationBodyX:F2} Heading {_planeRotateAccel.RotationAccelerationBodyY:F2}");
+
+                            if (!double.IsNaN(_planeRotateAccel.RotationAccelerationBodyX) && Math.Abs(_planeRotateAccel.RotationAccelerationBodyX) < 1000 &&
+                                !double.IsNaN(_planeRotateAccel.RotationAccelerationBodyY) && Math.Abs(_planeRotateAccel.RotationAccelerationBodyY) < 1000 &&
+                                !double.IsNaN(_planeRotateAccel.RotationAccelerationBodyZ) && Math.Abs(_planeRotateAccel.RotationAccelerationBodyZ) < 1000)
+                            {
+                                try
+                                {
+                                    _fsConnect.UpdateData(Definitions.PlaneRotateAccel, _planeRotateAccel);
+                                }
+                                catch (Exception ex)
+                                {
+                                    addLogMessage(ex.Message);
+                                }
+                            }
                         }
                     }
                 }
@@ -1367,7 +1461,7 @@ namespace MSFS_Kinetic_Assistant
                 {
                     lightToggled = absoluteTime;
                     _planeAvionicsResponse.LIGHTLANDING = _planeAvionicsResponse.LIGHTLANDING == 100 ? 0 : 100;
-                    _planeAvionicsResponse.LIGHTTAXI = _planeAvionicsResponse.LIGHTLANDING == 100 ? 0 : 100;
+                    //_planeAvionicsResponse.LIGHTTAXI = _planeAvionicsResponse.LIGHTLANDING == 100 ? 0 : 100;
                     commitAvionicsData();
                 }
 
@@ -1498,15 +1592,15 @@ namespace MSFS_Kinetic_Assistant
                     Console.WriteLine("Launchpad acceleration: " + diff / lastFrameTiming);
 
                     // LIMIT ROTATION VELOCITY
-                    _planeRotate.RotationVelocityBodyX *= lastFrameTiming;
-                    _planeRotate.RotationVelocityBodyY *= lastFrameTiming;
-                    _planeRotate.RotationVelocityBodyZ *= lastFrameTiming;
+                    _planeRotateVelocity.RotationVelocityBodyX *= lastFrameTiming;
+                    _planeRotateVelocity.RotationVelocityBodyY *= lastFrameTiming;
+                    _planeRotateVelocity.RotationVelocityBodyZ *= lastFrameTiming;
 
-                    if (!double.IsNaN(_planeRotate.RotationVelocityBodyX) && !double.IsNaN(_planeRotate.RotationVelocityBodyY) && !double.IsNaN(_planeRotate.RotationVelocityBodyZ))
+                    if (!double.IsNaN(_planeRotateVelocity.RotationVelocityBodyX) && !double.IsNaN(_planeRotateVelocity.RotationVelocityBodyY) && !double.IsNaN(_planeRotateVelocity.RotationVelocityBodyZ))
                     {
                         try
                         {
-                            _fsConnect.UpdateData(Definitions.PlaneRotate, _planeRotate);
+                            _fsConnect.UpdateData(Definitions.PlaneRotationVelocity, _planeRotateVelocity);
                         }
                         catch (Exception ex)
                         {
@@ -1624,15 +1718,15 @@ namespace MSFS_Kinetic_Assistant
                     else if (!double.IsNaN(cableTension) && lastFrameTiming != 0 && cableTension != 0 && _carrierDirection.localForceDirection.Norm > 0)
                     {
                         // LIMIT ROTATION VELOCITY
-                        _planeRotate.RotationVelocityBodyX *= lastFrameTiming;
-                        _planeRotate.RotationVelocityBodyY *= lastFrameTiming;
-                        _planeRotate.RotationVelocityBodyZ *= lastFrameTiming;
+                        _planeRotateVelocity.RotationVelocityBodyX *= lastFrameTiming;
+                        _planeRotateVelocity.RotationVelocityBodyY *= lastFrameTiming;
+                        _planeRotateVelocity.RotationVelocityBodyZ *= lastFrameTiming;
 
-                        if (!double.IsNaN(_planeRotate.RotationVelocityBodyX) && !double.IsNaN(_planeRotate.RotationVelocityBodyY) && !double.IsNaN(_planeRotate.RotationVelocityBodyZ))
+                        if (!double.IsNaN(_planeRotateVelocity.RotationVelocityBodyX) && !double.IsNaN(_planeRotateVelocity.RotationVelocityBodyY) && !double.IsNaN(_planeRotateVelocity.RotationVelocityBodyZ))
                         {
                             try
                             {
-                                _fsConnect.UpdateData(Definitions.PlaneRotate, _planeRotate);
+                                _fsConnect.UpdateData(Definitions.PlaneRotationVelocity, _planeRotateVelocity);
                             }
                             catch (Exception ex)
                             {
@@ -1862,7 +1956,7 @@ namespace MSFS_Kinetic_Assistant
                             (data[7].Contains(" ") && double.TryParse(data[7].Split(' ')[0].Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out radius) && double.TryParse(data[7].Split(' ')[1].Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out strength) ||
                             double.TryParse(data[7].Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out radius)))
                         {
-                            winchPosition _thermalPosition = new winchPosition(new GeoLocation(lat / 180 * Math.PI, lng / 180 * Math.PI), 0.305 * alt, 1852 * radius, strength / 1.9 * 5);
+                            winchPosition _thermalPosition = new winchPosition(new GeoLocation(lat / 180 * Math.PI, lng / 180 * Math.PI), 0.305 * alt, 1852 * radius, 0.75 * strength / 1.9 * 5);
                             thermalsList.Add(_thermalPosition);
                             //radarThermals.Add(_thermalPosition);
                         }
@@ -1884,6 +1978,7 @@ namespace MSFS_Kinetic_Assistant
 
         private void insertApiThermals(string content, double[] bounds)
         {
+            Random rand = new Random();
             Application.Current.Dispatcher.Invoke(() => _radarClass.clearRadarThermals(RadarCanvas, "ThermalAPI"));
 
             foreach (string line in content.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None))
@@ -1893,8 +1988,8 @@ namespace MSFS_Kinetic_Assistant
                     string[] data = line.Split(',');
                     if (data.Length >= 4)
                     {
-                        double radius = 0.9;
-                        double strength = 20; // KNOTS
+                        double radius = 0.5;
+                        double strength = 25; // KNOTS
 
                         if (double.TryParse(data[0], NumberStyles.Any, CultureInfo.InvariantCulture, out double lat) &&
                             double.TryParse(data[1], NumberStyles.Any, CultureInfo.InvariantCulture, out double lng) &&
@@ -1910,8 +2005,7 @@ namespace MSFS_Kinetic_Assistant
                             double modifier = probability / 100;
                             lat = lat / 180 * Math.PI;
                             lng = lng / 180 * Math.PI;
-                            radius *= 1852 * modifier;
-
+                            radius *= 1852 * modifier * (1 + 0.5 * rand.NextDouble());
                             // CHECK SIBLINGS
                             if (thermalsListAPI.Count > 0)
                             {
@@ -1935,7 +2029,7 @@ namespace MSFS_Kinetic_Assistant
                             }
 
 
-                            winchPosition _thermalPosition = new winchPosition(new GeoLocation(lat, lng), 0, radius, strength / 1.9 * modifier);
+                            winchPosition _thermalPosition = new winchPosition(new GeoLocation(lat, lng), 0, radius, 0.75 * strength / 1.9 * modifier);
                             thermalsListAPI.Add(_thermalPosition);
                         }
                         else
@@ -2073,8 +2167,7 @@ namespace MSFS_Kinetic_Assistant
                         //Console.WriteLine("Thermal leaning: " + thermalLeaning.ToString("0.0") + " width scale: " + (1 + windModifier));
 
                         // DISTANCE TO THE CENTER
-                        double horizontalModifier = thermalTemp.radius - _thermalDirection.groundDistance < 100 ?
-                            (thermalTemp.radius - _thermalDirection.groundDistance) / 100 : 1;
+                        double horizontalModifier = Math.Pow((thermalTemp.radius - _thermalDirection.groundDistance) / thermalTemp.radius, 0.25);
 
                         // DISTANCE TO THE TOP
                         double verticalModifier = acAltitude < height ?
@@ -2088,7 +2181,7 @@ namespace MSFS_Kinetic_Assistant
 
                             // AIRSPEED
                             double airspeedModifier = _planeInfoResponse.AirspeedIndicated < 150 ? Math.Pow(Math.Max(0, 1 - _planeInfoResponse.AirspeedIndicated / 150), 0.5) : 0; // OVERSPEED
-                            airspeedModifier *= _planeInfoResponse.AirspeedIndicated > 15 ? Math.Pow(Math.Max(0, (_planeInfoResponse.AirspeedIndicated - 15) / 135), 0.5) : 0; // STALL
+                            airspeedModifier *= _planeInfoResponse.AirspeedIndicated > 20 ? Math.Pow(Math.Max(0, (_planeInfoResponse.AirspeedIndicated - 20) / 130), 0.5) : 0; // STALL
                             airspeedModifier = Math.Min(1, 3 * airspeedModifier); // POW COMPENSATION
 
                             double ambientModifier = (1 - windModifier) * overcastModifier * dayTimeModifier;
@@ -2099,66 +2192,56 @@ namespace MSFS_Kinetic_Assistant
                             thermalFlow += thermal.airspeed * finalModifier;
 
                             finalModifier *= pitchBankModifier * airspeedModifier;
-                            double liftAmount = thermal.airspeed * finalModifier + Math.Abs(_planeInfoResponse.AmbientWindY);
+                            double liftAmount = -_thermalDirection.localForceDirection.Y * thermal.airspeed * finalModifier;// + Math.Abs(_planeInfoResponse.AmbientWindY);
 
-                            // COMPARE VERTICAL VELOCITY AND UPLIFT
-                            if (finalModifier > 0 && _planeInfoResponse.VerticalSpeed < liftAmount)
+                            // COMPARE WITH TE
+                            liftAmount = liftAmount - Math.Max(0, te_raw_ms);
+
+                            if (liftAmount > 0)
                             {
-                                //liftAmount = Math.Min(liftAmount, Math.Pow(liftAmount - _planeInfoResponse.VerticalSpeed, 2));
-                                liftAmount = liftAmount - Math.Max(0, _planeInfoResponse.VerticalSpeed);
-                            }
-                            else
-                            {
-                                liftAmount /= 2.0;
-                            }
-
-                            Console.WriteLine("LiftY: " + (-_thermalDirection.localForceDirection.Y * liftAmount) + " thermalFlow: " + thermalFlow + " VSpeed: " + _planeInfoResponse.VerticalSpeed);
-
-                            if (liftAmount != 0)
-                            {
-
-
-                                double oldMagnitude = Math.Pow(Math.Pow(_planeCommit.VelocityBodyX, 2) + Math.Pow(_planeCommit.VelocityBodyY, 2) + Math.Pow(_planeCommit.VelocityBodyZ, 2), 0.5);
-                                _planeCommit.VelocityBodyY -= _thermalDirection.localForceDirection.Y * liftAmount * lastFrameTiming;
-
-                                // FORWARD SPEED COMPENSATION
-                                if (_planeCommit.VelocityBodyZ > 10 && _planeCommit.VelocityBodyZ < 60)
+                                // PUSH OUT FROM THE THERMAL
+                                double assimetricalLift = (1 - Math.Pow(horizontalModifier, 0.05)) *
+                                    Math.Sin(_thermalDirection.heading) * Math.Cos(_planeInfoResponse.PlaneBank) *
+                                    thermal.airspeed;
+                                if (assimetricalLift > 0.2 || assimetricalLift < -0.2)
                                 {
-                                    _planeCommit.VelocityBodyZ += Math.Max(0, Math.Min(liftAmount, (50 - 0.8 * _planeCommit.VelocityBodyZ) / 50))
-                                        * Math.Cos(Math.Min(0, _planeInfoResponse.PlanePitch))
-                                        * lastFrameTiming;
-                                    /*double newMagnitude = Math.Pow(Math.Pow(_planeCommit.VelocityBodyX, 2) + Math.Pow(_planeCommit.VelocityBodyY, 2) + Math.Pow(_planeCommit.VelocityBodyZ, 2), 0.5);
-                                    double mod = (newMagnitude / oldMagnitude - 1) * 2 + 1;
-                                    Console.WriteLine(mod);
-                                    if (mod > 1)
-                                    {
-                                        _planeCommit.VelocityBodyX *= mod;
-                                        _planeCommit.VelocityBodyZ *= mod;
-                                    }*/
+                                    assimetricalLift -= assimetricalLift > 0 ? 0.2 : -0.2;
+                                    //Console.WriteLine("assimetricalLift: " + assimetricalLift + " heading: " + Math.Sin(_thermalDirection.heading));
+                                    _fsConnect.UpdateData(Definitions.RotationVelocityZCommit, _planeInfoResponse.RotationAccelerationBodyZ + 25 * assimetricalLift);
                                 }
 
-                                if (!double.IsNaN(_planeCommit.VelocityBodyX) && !double.IsNaN(_planeCommit.VelocityBodyY) && !double.IsNaN(_planeCommit.VelocityBodyZ))
+                                try
                                 {
-                                    try
+                                    //Console.WriteLine("LiftY: " + liftAmount + " thermalFlow: " + thermalFlow + " TE: " + te_raw_ms);
+
+                                    if (_planeInfoResponse.FoldingWindR == 0)
                                     {
-                                        _fsConnect.UpdateData(Definitions.PlaneCommit, _planeCommit);
+                                        _planeVerticalVelocity.VelocityBodyY = _planeInfoResponse.VelocityBodyY + (_planeInfoResponse.AccelerationBodyY + liftAmount) * lastFrameTiming;
+                                        _planeVerticalVelocity.VelocityBodyZ = _planeInfoResponse.VelocityBodyZ + (_planeInfoResponse.AccelerationBodyZ + liftAmount / 2) * lastFrameTiming;
+                                        _planeVerticalVelocity.RotationAccelerationBodyX = _planeInfoResponse.RotationAccelerationBodyX + 
+                                            liftAmount * Math.Max(0, Math.Min(0.34, 0.17 - (_planeInfoResponse.PlanePitch + _planeInfoResponse.RotationVelocityBodyX)));
 
-
-                                        /*string bar = "||||||||||||||||||||||||||||||||||||||||||||||||||";
-                                        Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Height = 90);
-                                        Application.Current.Dispatcher.Invoke(() => messagesLogScroll.Height = 0);
-                                        Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Children.Add(makeTextBlock("To center:  " + bar.Substring(0, (int)(horizontalModifier * 100 / 4)), Colors.Black, 12)));
-                                        Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Children.Add(makeTextBlock("To top:     " + bar.Substring(0, (int)(verticalModifier * 100 / 4)), (height - acAltitude) > 0 ? Colors.Black : Colors.DarkRed, 12)));
-                                        Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Children.Add(makeTextBlock("Pitch/bank: " + bar.Substring(0, (int)(pitchBankModifier * 100 / 4)), Colors.Black, 12)));
-                                        Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Children.Add(makeTextBlock("Velocity:   " + bar.Substring(0, (int)(airspeedModifier * 100 / 4)), Colors.Black, 12)));
-                                        Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Children.Add(makeTextBlock("Ambient:    " + bar.Substring(0, (int)(ambientModifier * 100 / 4)) + Environment.NewLine + Environment.NewLine, ambientModifier > 0 ? Colors.Black : Colors.DarkRed, 12)));
-                                        Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Children.Add(makeTextBlock("Total lift: " + bar.Substring(0, (int)(finalModifier * 100 / 4)) + Environment.NewLine + Environment.NewLine, finalModifier > 0 ? Colors.Black : Colors.DarkRed, 12)));*/
+                                        if (!double.IsNaN(_planeVerticalVelocity.VelocityBodyY) && !double.IsNaN(_planeVerticalVelocity.VelocityBodyZ) && !double.IsNaN(_planeVerticalVelocity.RotationAccelerationBodyX))
+                                            _fsConnect.UpdateData(Definitions.ThermalVelocityCommit, _planeVerticalVelocity);
                                     }
-                                    catch (Exception ex)
+                                    else
                                     {
-                                        Console.WriteLine(ex.Message);
+                                        _fsConnect.UpdateData(Definitions.FoldingWindCommit, liftAmount);
                                     }
 
+                                    /*string bar = "||||||||||||||||||||||||||||||||||||||||||||||||||";
+                                    Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Height = 90);
+                                    Application.Current.Dispatcher.Invoke(() => messagesLogScroll.Height = 0);
+                                    Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Children.Add(makeTextBlock("To center:  " + bar.Substring(0, (int)(horizontalModifier * 100 / 4)), Colors.Black, 12)));
+                                    Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Children.Add(makeTextBlock("To top:     " + bar.Substring(0, (int)(verticalModifier * 100 / 4)), (height - acAltitude) > 0 ? Colors.Black : Colors.DarkRed, 12)));
+                                    Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Children.Add(makeTextBlock("Pitch/bank: " + bar.Substring(0, (int)(pitchBankModifier * 100 / 4)), Colors.Black, 12)));
+                                    Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Children.Add(makeTextBlock("Velocity:   " + bar.Substring(0, (int)(airspeedModifier * 100 / 4)), Colors.Black, 12)));
+                                    Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Children.Add(makeTextBlock("Ambient:    " + bar.Substring(0, (int)(ambientModifier * 100 / 4)) + Environment.NewLine + Environment.NewLine, ambientModifier > 0 ? Colors.Black : Colors.DarkRed, 12)));
+                                    Application.Current.Dispatcher.Invoke(() => thermalsDebugData.Children.Add(makeTextBlock("Total lift: " + bar.Substring(0, (int)(finalModifier * 100 / 4)) + Environment.NewLine + Environment.NewLine, finalModifier > 0 ? Colors.Black : Colors.DarkRed, 12)));*/
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine(ex.Message);
                                 }
 
                                 /*try
@@ -2236,10 +2319,10 @@ namespace MSFS_Kinetic_Assistant
                             weatherChecked = 0;
                         }
 
-                        _planeRotate = new PlaneInfoRotate();
-                        _planeRotate.RotationVelocityBodyX = _planeInfoResponse.RotationVelocityBodyX;
-                        _planeRotate.RotationVelocityBodyY = _planeInfoResponse.RotationVelocityBodyY;
-                        _planeRotate.RotationVelocityBodyZ = _planeInfoResponse.RotationVelocityBodyZ;
+                        _planeRotateVelocity = new PlaneInfoRotateVelocity();
+                        _planeRotateVelocity.RotationVelocityBodyX = _planeInfoResponse.RotationVelocityBodyX;
+                        _planeRotateVelocity.RotationVelocityBodyY = _planeInfoResponse.RotationVelocityBodyY;
+                        _planeRotateVelocity.RotationVelocityBodyZ = _planeInfoResponse.RotationVelocityBodyZ;
 
                         _planeRotateAccel = new PlaneInfoRotateAccel();
                         _planeRotateAccel.RotationAccelerationBodyX = _planeInfoResponse.RotationAccelerationBodyX;
@@ -2280,6 +2363,16 @@ namespace MSFS_Kinetic_Assistant
                         // PAST COMMIT
                         if (lastPacketReceived != 0 /*1000 * lastFrameTiming > interval * 0.75*/ && lastFrameTiming > 0.001 && lastFrameTiming <= 1.0 && _planeAvionicsResponse.IsSlewActive != 100)
                         {
+                            // CALCULATE TOTAL ENERGY
+                            double vertical_speed = (_planeInfoResponse.Altitude - _planeInfoResponseLast.Altitude) / lastFrameTiming;
+                            double te_compensation = (Math.Pow(_planeInfoResponse.AirspeedIndicated, 2) - Math.Pow(_planeInfoResponseLast.AirspeedIndicated, 2)) / (2 * lastFrameTiming * 9.80665);
+                            double newTE = (vertical_speed + te_compensation) * _planeInfoResponse.AirspeedIndicated / _planeInfoResponse.AirspeedTrue;
+                            if (newTE < 20 && newTE > -20)
+                            {
+                                te_raw_ms = Math.Max(-10, Math.Min(10, (1 - 5 * lastFrameTiming) * te_raw_ms + 5 * lastFrameTiming * newTE));
+                                //Console.WriteLine("vertical_speed: " + vertical_speed + " te_compensation: " + te_compensation + " newTE: " + newTE + " te_raw_ms: " + te_raw_ms);
+                            }
+
                             // TRACK RECORDING
                             if (_trackingClass.trackRecording != null && _trackingClass.recordingCounter > 0)
                             {
@@ -2395,12 +2488,16 @@ namespace MSFS_Kinetic_Assistant
                                 _trackingClass.message = new KeyValuePair<uint, string>();
                             }
 
-                            if (!double.IsNaN(towCommit.RotationVelocityBodyX) && !double.IsNaN(towCommit.RotationVelocityBodyY) && !double.IsNaN(towCommit.RotationVelocityBodyZ) && !double.IsNaN(towCommit.VelocityBodyX) &&
-                                !double.IsNaN(towCommit.VelocityBodyZ) && !double.IsNaN(towCommit.VelocityBodyZ))
+                            if (//!double.IsNaN(towCommit.RotationVelocityBodyX) && !double.IsNaN(towCommit.RotationVelocityBodyY) && !double.IsNaN(towCommit.RotationVelocityBodyZ) &&
+                                !double.IsNaN(towCommit.planeHeading) && !double.IsNaN(towCommit.planePitch) && !double.IsNaN(towCommit.planeRoll) &&
+                                !double.IsNaN(towCommit.VelocityBodyX) && !double.IsNaN(towCommit.VelocityBodyZ) && !double.IsNaN(towCommit.VelocityBodyZ))
                             {
                                 try
                                 {
+                                    //Console.WriteLine($"RotationVelocityBodyX: {towCommit.RotationVelocityBodyX:F4} RotationVelocityBodyY: {towCommit.RotationVelocityBodyY:F4} RotationVelocityBodyZ: {towCommit.RotationVelocityBodyZ:F4}");
+                                    //Console.WriteLine($"VelocityBodyZ: {towCommit.VelocityBodyZ:F4}");
                                     _fsConnect.UpdateData(Definitions.GhostCommit, towCommit, e.ObjectID);
+
                                 }
                                 catch (Exception ex)
                                 {
@@ -2699,24 +2796,49 @@ namespace MSFS_Kinetic_Assistant
             definition.Add(new SimProperty(FsSimVar.PlaneBank, FsUnit.Radians, SIMCONNECT_DATATYPE.FLOAT64));
             definition.Add(new SimProperty(FsSimVar.GpsGroundSpeed, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
             definition.Add(new SimProperty(FsSimVar.AirspeedIndicated, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
+            definition.Add(new SimProperty(FsSimVar.AirspeedTrue, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
             definition.Add(new SimProperty(FsSimVar.Verticalspeed, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
             definition.Add(new SimProperty(FsSimVar.AmbientWindY, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
             definition.Add(new SimProperty(FsSimVar.VelocityBodyX, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
             definition.Add(new SimProperty(FsSimVar.VelocityBodyY, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
             definition.Add(new SimProperty(FsSimVar.VelocityBodyZ, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
+            definition.Add(new SimProperty(FsSimVar.AccelerationBodyY, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
+            definition.Add(new SimProperty(FsSimVar.AccelerationBodyZ, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
             definition.Add(new SimProperty(FsSimVar.RotationVelocityBodyX, FsUnit.RadianPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
             definition.Add(new SimProperty(FsSimVar.RotationVelocityBodyY, FsUnit.RadianPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
             definition.Add(new SimProperty(FsSimVar.RotationVelocityBodyZ, FsUnit.RadianPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
+            definition.Add(new SimProperty(FsSimVar.RotationAccelerationBodyX, FsUnit.RadianPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
+            definition.Add(new SimProperty(FsSimVar.RotationAccelerationBodyY, FsUnit.RadianPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
+            definition.Add(new SimProperty(FsSimVar.RotationAccelerationBodyZ, FsUnit.RadianPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
+            definition.Add(new SimProperty(FsSimVar.FoldingWindR, FsUnit.Percent, SIMCONNECT_DATATYPE.FLOAT64));
 
-            // VELOCITY COMMIT
             fsConnect.RegisterDataDefinition<PlaneInfoResponse>(Definitions.PlaneInfo, definition);
 
+            // VELOCITY COMMIT
             List<SimProperty> cDefinition = new List<SimProperty>();
             cDefinition.Add(new SimProperty(FsSimVar.VelocityBodyX, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
             cDefinition.Add(new SimProperty(FsSimVar.VelocityBodyY, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
             cDefinition.Add(new SimProperty(FsSimVar.VelocityBodyZ, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
 
             fsConnect.RegisterDataDefinition<PlaneInfoCommit>(Definitions.PlaneCommit, cDefinition);
+
+            List<SimProperty> vDefinition = new List<SimProperty>();
+            vDefinition.Add(new SimProperty(FsSimVar.VelocityBodyY, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
+            vDefinition.Add(new SimProperty(FsSimVar.VelocityBodyZ, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
+            vDefinition.Add(new SimProperty(FsSimVar.RotationAccelerationBodyX, FsUnit.RadianPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
+            //vDefinition.Add(new SimProperty(FsSimVar.FoldingWindR, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
+
+            fsConnect.RegisterDataDefinition<ThermalVelocity>(Definitions.ThermalVelocityCommit, vDefinition);
+
+            List<SimProperty> fDefinition = new List<SimProperty>();
+            fDefinition.Add(new SimProperty(FsSimVar.FoldingWindR, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
+
+            fsConnect.RegisterDataDefinition<double>(Definitions.FoldingWindCommit, fDefinition);
+
+            List<SimProperty> rxDefinition = new List<SimProperty>();
+            rxDefinition.Add(new SimProperty(FsSimVar.RotationAccelerationBodyZ, FsUnit.RadianPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
+
+            fsConnect.RegisterDataDefinition<double>(Definitions.RotationVelocityZCommit, rxDefinition);
 
             // AVIONICS
             List<SimProperty> aDefinition = new List<SimProperty>();
@@ -2764,12 +2886,12 @@ namespace MSFS_Kinetic_Assistant
             rDefinition.Add(new SimProperty(FsSimVar.RotationVelocityBodyY, FsUnit.RadianPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
             rDefinition.Add(new SimProperty(FsSimVar.RotationVelocityBodyZ, FsUnit.RadianPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
 
-            fsConnect.RegisterDataDefinition<PlaneInfoRotate>(Definitions.PlaneRotate, rDefinition);
+            fsConnect.RegisterDataDefinition<PlaneInfoRotateVelocity>(Definitions.PlaneRotationVelocity, rDefinition);
 
             List<SimProperty> raDefinition = new List<SimProperty>();
-            raDefinition.Add(new SimProperty(FsSimVar.RotationVelocityBodyX, FsUnit.RadianPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
-            raDefinition.Add(new SimProperty(FsSimVar.RotationVelocityBodyY, FsUnit.RadianPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
-            raDefinition.Add(new SimProperty(FsSimVar.RotationVelocityBodyZ, FsUnit.RadianPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
+            raDefinition.Add(new SimProperty(FsSimVar.RotationAccelerationBodyX, FsUnit.RadianPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
+            raDefinition.Add(new SimProperty(FsSimVar.RotationAccelerationBodyY, FsUnit.RadianPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
+            raDefinition.Add(new SimProperty(FsSimVar.RotationAccelerationBodyZ, FsUnit.RadianPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
 
             fsConnect.RegisterDataDefinition<PlaneInfoRotateAccel>(Definitions.PlaneRotateAccel, raDefinition);
 
@@ -2816,9 +2938,12 @@ namespace MSFS_Kinetic_Assistant
             gDefinition.Add(new SimProperty(FsSimVar.VelocityBodyX, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
             gDefinition.Add(new SimProperty(FsSimVar.VelocityBodyY, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
             gDefinition.Add(new SimProperty(FsSimVar.VelocityBodyZ, FsUnit.MeterPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
-            gDefinition.Add(new SimProperty(FsSimVar.RotationVelocityBodyX, FsUnit.RadianPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
-            gDefinition.Add(new SimProperty(FsSimVar.RotationVelocityBodyY, FsUnit.RadianPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
-            gDefinition.Add(new SimProperty(FsSimVar.RotationVelocityBodyZ, FsUnit.RadianPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
+            //gDefinition.Add(new SimProperty(FsSimVar.RotationVelocityBodyX, FsUnit.RadianPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
+            //gDefinition.Add(new SimProperty(FsSimVar.RotationVelocityBodyY, FsUnit.RadianPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
+            //gDefinition.Add(new SimProperty(FsSimVar.RotationVelocityBodyZ, FsUnit.RadianPerSecond, SIMCONNECT_DATATYPE.FLOAT64));
+            gDefinition.Add(new SimProperty(FsSimVar.PlaneHeading, FsUnit.Radians, SIMCONNECT_DATATYPE.FLOAT64));
+            gDefinition.Add(new SimProperty(FsSimVar.PlanePitch, FsUnit.Radians, SIMCONNECT_DATATYPE.FLOAT64));
+            gDefinition.Add(new SimProperty(FsSimVar.PlaneBank, FsUnit.Radians, SIMCONNECT_DATATYPE.FLOAT64));
 
             fsConnect.RegisterDataDefinition<GhostCommit>(Definitions.GhostCommit, gDefinition);
 

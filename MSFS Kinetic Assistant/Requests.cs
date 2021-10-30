@@ -4,7 +4,7 @@
     {
         PlaneInfo = 0,
         PlaneCommit = 1,
-        PlaneRotate = 2,
+        PlaneRotationVelocity = 2,
         NearbyObjects = 3,
         TowPlane = 4,
         Airport = 5,
@@ -21,13 +21,16 @@
         PlaneLift = 16,
         GhostCommit = 17,
         PlaneRotateAccel = 18,
+        ThermalVelocityCommit = 19,
+        FoldingWindCommit = 20,
+        RotationVelocityZCommit = 21,
     }
 
     public enum Definitions
     {
         PlaneInfo = 0,
         PlaneCommit = 1,
-        PlaneRotate = 2,
+        PlaneRotationVelocity = 2,
         NearbyObjects = 3,
         TowPlane = 4,
         Airport = 5,
@@ -44,5 +47,8 @@
         PlaneLift = 16,
         GhostCommit = 17,
         PlaneRotateAccel = 18,
+        ThermalVelocityCommit = 19,
+        FoldingWindCommit = 20,
+        RotationVelocityZCommit = 21,
     }
 }

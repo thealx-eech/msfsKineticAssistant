@@ -16,17 +16,21 @@ namespace MSFS_Kinetic_Assistant
         public double PlaneBank;
         public double GpsGroundSpeed;
         public double AirspeedIndicated;
+        public double AirspeedTrue;
         public double VerticalSpeed;
         public double AmbientWindY;
         public double VelocityBodyX;
         public double VelocityBodyY;
         public double VelocityBodyZ;
+        public double AccelerationBodyY;
+        public double AccelerationBodyZ;
         public double RotationVelocityBodyX;
         public double RotationVelocityBodyY;
         public double RotationVelocityBodyZ;
         public double RotationAccelerationBodyX;
         public double RotationAccelerationBodyY;
         public double RotationAccelerationBodyZ;
+        public double FoldingWindR;
     };
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
@@ -38,7 +42,7 @@ namespace MSFS_Kinetic_Assistant
     };
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
-    public struct PlaneInfoRotate
+    public struct PlaneInfoRotateVelocity
     {
         public double RotationVelocityBodyX;
         public double RotationVelocityBodyY;
@@ -97,6 +101,16 @@ namespace MSFS_Kinetic_Assistant
         public double Altitude;
     };
 
+    public struct ThermalVelocity
+    {
+        public double VelocityBodyY;
+        public double VelocityBodyZ;
+        public double RotationAccelerationBodyX;
+        //public double FoldingWindR;
+
+    };
+
+
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
     public struct NearbyInfoResponse
     {
@@ -149,9 +163,12 @@ namespace MSFS_Kinetic_Assistant
         public double VelocityBodyX;
         public double VelocityBodyY;
         public double VelocityBodyZ;
-        public double RotationVelocityBodyX;
-        public double RotationVelocityBodyY;
-        public double RotationVelocityBodyZ;
+        //public double RotationVelocityBodyX;
+        //public double RotationVelocityBodyY;
+        //public double RotationVelocityBodyZ;
+        public double planeHeading;
+        public double planePitch;
+        public double planeRoll;
 
     };
 

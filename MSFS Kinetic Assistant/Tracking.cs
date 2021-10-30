@@ -448,29 +448,39 @@ namespace MSFS_Kinetic_Assistant
                             double progress = ((ghostPlane.Progress + deltaTime) - prev.Timer) / (curr.Timer - prev.Timer);
                             double timeLeft = curr.Timer - (ghostPlane.Progress + deltaTime);
 
-                            double distancePrev = _mathClass.findDistanceBetweenPoints(response.Latitude, response.Longitude, prev.Location.Latitude, prev.Location.Longitude);
+                            //double distancePrev = _mathClass.findDistanceBetweenPoints(response.Latitude, response.Longitude, prev.Location.Latitude, prev.Location.Longitude);
                             double distanceCurr = _mathClass.findDistanceBetweenPoints(response.Latitude, response.Longitude, curr.Location.Latitude, curr.Location.Longitude);
-                            double distanceNext = _mathClass.findDistanceBetweenPoints(response.Latitude, response.Longitude, next.Location.Latitude, next.Location.Longitude);
+                            //double distanceNext = _mathClass.findDistanceBetweenPoints(response.Latitude, response.Longitude, next.Location.Latitude, next.Location.Longitude);
+
+                            /*if (distanceCurr / timeLeft > 1.25 * curr.Velocity)
+                            {
+                                distanceCurr = 1.25 * curr.Velocity * timeLeft;
+                                Console.WriteLine($"TOO FAR FROM NEXT POINT: {distanceCurr:F6}");
+                            }*/
+
 
                             double bearing = normalizeRadAngle(_mathClass.findBearingToPoint(response.Latitude, response.Longitude, next.Location.Latitude, next.Location.Longitude));
                             response.Heading = normalizeRadAngle(response.Heading);
                             bearing = zeroeRadAngle(bearing - response.Heading);
                             double newHeading = zeroeRadAngle(response.Heading + (absoluteTime - ghostPlane.LastTrackPlayed) * bearing);
-                            towCommit.RotationVelocityBodyY = Math.Sin(newHeading - response.Heading);
+                            //towCommit.RotationVelocityBodyY = Math.Sin(newHeading - response.Heading);
+                            towCommit.planeHeading = newHeading;
                             //Console.WriteLine($"Tracking heading: {response.Heading:F4} bearing: {bearing:F4} newHeading: {newHeading:F4}");
 
                             double requiredBank = ((1 - progress) * (prev.Roll * Math.PI / 180 - response.Bank) + progress * (curr.Roll * Math.PI / 180 - response.Bank)) / 2;
-                            towCommit.RotationVelocityBodyZ = Math.Sin(requiredBank - response.Bank);
+                            //towCommit.RotationVelocityBodyZ = Math.Sin(requiredBank - response.Bank);
+                            towCommit.planeRoll = requiredBank;
                             double requiredPitch = ((1 - progress) * (prev.Pitch * Math.PI / 180 - response.Pitch) + progress * (prev.Pitch * Math.PI / 180 - response.Pitch)) / 2;
-                            towCommit.RotationVelocityBodyX = Math.Sin(requiredPitch - response.Pitch);
+                            //towCommit.RotationVelocityBodyX = Math.Sin(requiredPitch - response.Pitch);
+                            towCommit.planePitch = requiredPitch;
 
                             //Console.WriteLine($"RotationVelocityBodyX: {towCommit.RotationVelocityBodyX:F4} RotationVelocityBodyY: {towCommit.RotationVelocityBodyY:F4} RotationVelocityBodyZ: {towCommit.RotationVelocityBodyZ:F4}");
                             //towCommit.Heading = newHeading;
 
                             towCommit.VelocityBodyX = 0;
                             towCommit.VelocityBodyY = ((1 - progress) * (prev.Elevation - response.Altitude) + progress * (curr.Elevation - response.Altitude)) / 2;
-                            towCommit.VelocityBodyZ = (0.8 * curr.Velocity + 0.1 * distanceCurr / Math.Max(1, timeLeft)) * (Math.Abs(distanceCurr) < 10 ? Math.Abs(distanceCurr) / 10 : 1);
-
+                            towCommit.VelocityBodyZ = (0.9 * curr.Velocity + 0.1 * distanceCurr / Math.Max(1, timeLeft)) * (distanceCurr < 10 ? distanceCurr / 10 : 1);
+                            
                             // TAXIING
                             if (towCommit.VelocityBodyZ < 1 && towCommit.VelocityBodyZ > -1)
                             {
@@ -523,6 +533,10 @@ namespace MSFS_Kinetic_Assistant
                 gp.Progress += deltaTime;
 
                 ghostPlanes[index] = gp;
+            }
+            else
+            {
+
             }
 
 
